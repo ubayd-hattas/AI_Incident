@@ -1,10 +1,15 @@
 import json
 import hashlib
 import csv
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-rev_file = ROOT / "data" / "data" / "raw" / "export" / "revisions.jsonl"
+# Was "data" / "data" / "raw" / "export" -- a doubled, git-untracked path that only
+# "worked" on a machine with a stale leftover directory (see
+# audit/SAM_RESPONSE_TO_PRE_RESULTS_AUDIT.md). data/ is never git-tracked (clean-room
+# download recipe in sources/README.md); the correct, single-nested path is below.
+rev_file = ROOT / "data" / "raw" / "export" / "revisions.jsonl"
 ev_file = ROOT / "annotations" / "evidence.jsonl"
 occ_file = ROOT / "annotations" / "occurrences.jsonl"
 splits_file = ROOT / "annotations" / "splits.json"
@@ -113,4 +118,7 @@ print(f"Adjudication verified: 65/65 APPROVED by {adj_rows[0]['adjudicator']} wi
 print(f"\n==========================================")
 print(f"OVERALL A11 BENCHMARK VERIFICATION: {'SUCCESS' if all_pass else 'FAILED'}")
 print(f"==========================================")
+
+if not all_pass:
+    sys.exit(1)
 

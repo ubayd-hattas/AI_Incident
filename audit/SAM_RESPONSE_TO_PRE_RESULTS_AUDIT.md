@@ -1,5 +1,10 @@
 # Response to the final hostile pre-results audit (`docs/PRE_RESULTS_AUDIT.md`)
 
+> **Update:** X01, X02, and A04 (confirmed real below) have since been fixed in `src/ebe/observer.py` and
+> `src/ebe/collectors.py`, with full re-verification against the existing test suite and every audit script in this
+> directory. See `audit/X01_X02_A04_FIXES.md` for exactly what changed and why. The findings below describe the
+> bugs as originally confirmed; they are not stale, just superseded by that follow-up.
+
 Role: independent validation (Sam). This document independently re-checks the pre-results audit's concrete,
 falsifiable claims rather than taking them on trust or defending prior work reflexively — the same discipline
 applied to Ubayd's and Jaswin's work all along applies to this audit too. Three claims are **confirmed** by fresh,
@@ -135,9 +140,9 @@ concrete claim in A/H/I through the actual `Observer`/`accounting`/`storage` cod
 
 - **A02 is not a blocker as stated.** The accounting acceptance's custody is intact; no reacceptance of *content*
   is needed (though nothing here waives Aaron's still-open optional second confirmation).
-- **X01, X02, A04 are real and now independently confirmed**, not just asserted by one audit pass — they remain
-  correctly classified as pre-X13/pre-E12 blockers and are not fixed by this document. Fixing `src/ebe/observer.py`
-  and `src/ebe/collectors.py` is implementation work belonging to Ubayd, not this validation pass.
+- **X01, X02, A04 are real and now independently confirmed**, not just asserted by one audit pass — and, given the
+  deadline, have since been fixed directly in `src/ebe/observer.py`/`src/ebe/collectors.py` (see
+  `audit/X01_X02_A04_FIXES.md`) rather than left as a handoff, with full test-suite and audit-script re-verification.
 - **D04 is fixed, not just disclosed** — A/H/I now have genuine real-code coverage.
 - Nothing else in the pre-results audit's findings was re-litigated here; its sensor-access matrix, PCD-strength
   analysis, and statistical-plan sections were not independently re-derived in this pass and stand as delivered.

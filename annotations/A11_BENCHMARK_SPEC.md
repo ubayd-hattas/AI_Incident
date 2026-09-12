@@ -3,9 +3,23 @@
 **Track 2, Apart × CeSIA AI Incident Response Research Sprint**  
 **Ticket A11 Delivery**: Freeze Benchmark Evidence, Occurrences & Splits  
 **Authors**: Alex (First-Labeler) & Aaron (Second-Reviewer / Provenance Lead)  
-**Adjudication**: Jaswin (Project Lead) | **Independent Audit**: Sam  
-**Status**: **FROZEN (CONTRACTUALLY ACCEPTED)**  
-**Frozen UTC**: `2026-09-12T20:55:00Z`  
+**Adjudication**: Jaswin (Project Lead)  
+**Status**: **DELIVERED — independently verified, 14/14 checks pass; see `audit/A11_INDEPENDENT_VERIFICATION.md`**  
+**Frozen UTC**: `2026-09-12T20:55:00Z` (mechanical fixes applied 2026-09-12, see below; content/adjudication substance unchanged)
+
+> **Correction (Sam, independent validation):** this document previously listed "Independent Audit: Sam" and stated
+> Ticket A11 was complete with E12/X13 "fully unblocked." Neither was accurate at the time. No independent audit of
+> A11 had been performed when this was written, and the pre-results gate register (`docs/PRE_RESULTS_AUDIT.md` §11)
+> explicitly requires A01–A05 closure before E12 and a *separate* GO before X13 — this document does not unblock
+> either on its own. An independent pass has since been done (`audit/A11_INDEPENDENT_VERIFICATION.md`,
+> `audit/verify_a11_independent.py`) and two real gaps it found have been fixed and re-verified (14/14 PASS): (1) 7
+> cross-title mirror pages referenced by occurrences.jsonl but absent from the `groups`/`splits.json` page catalogs
+> have been added (43 → 50 pages; `splits.json`'s hash was unaffected, only `groups`/`page_keys` grew), and (2) the
+> epistemic-leakage prose the earlier pre-results audit flagged (`PROP-20260620-09`, `PROP-20260619-03`) has been
+> revised to stop treating an agent self-report as externally confirmed fact (`evidence.jsonl`'s hash changed
+> accordingly, re-pinned in `splits.json` and the table below; no span, quotation, hash, or claim_status changed).
+> A03/A11's mechanical integrity is now fully closed. This still does not by itself authorize E12 or X13 — see the
+> gate register for what else is required.
 
 ---
 
@@ -14,7 +28,7 @@
 This document formally registers and cryptographically freezes the benchmark evaluation dataset for **Evidence Before Erasure (EBE)**, fulfilling all contractual criteria defined in `docs/EXECUTION_SPEC_v0.1.md` §3, §7 (Ticket A11), and `docs/R04_FROZEN_SPEC.md`:
 
 - **Target Episodes**: **71 validated page episodes** (37 Development / 34 Held-Out), greatly exceeding the $\ge 40$ episodes target.
-- **Title/Copy Groups**: **25 distinct groups** spanning 43 individual pages, exceeding the $\ge 20$ groups target.
+- **Title/Copy Groups**: **25 distinct groups** spanning 50 individual pages (revised 2026-09-12 to include 7 previously-uncataloged cross-title mirror pages, see correction note above), exceeding the $\ge 20$ groups target.
 - **Atomic Evidence Propositions**: **65 distinct propositions** (49 critical, 16 non-critical), comfortably within the contractual 60–120 proposition range.
 - **Occurrence Census**: **1,361 verified occurrence records** identified across the entire 13,403-revision DSE corpus, mapping primary introductions, cumulative carryforwards, and cross-title backup mirrors.
 - **Data Leakage Isolation**: **Zero overlap** ($0$ shared titles/copy groups) between `dev` and `held_out` splits. All episodes, subsequent edits, and cross-page mirrors of a title group are strictly clustered in the same split.
@@ -28,7 +42,7 @@ The evaluation benchmark is sealed under the following SHA-256 checksums:
 
 | Artifact | Path | SHA-256 Checksum |
 |---|---|---|
-| Evidence Units | `annotations/evidence.jsonl` | `ac3d6391784e87e338fc2a14c2289e64b46ecbd50c1ee7759c879ff51d70cdec` |
+| Evidence Units | `annotations/evidence.jsonl` | `5b89571d3faf4359fd462f69ff9305d04b60d1222d7f8d94386bb0b253c98f6e` (updated 2026-09-12, see correction note above) |
 | Occurrence Census | `annotations/occurrences.jsonl` | `7edb1331c44ecbfd9efa2eed9fe8ef82f082dab20c161a53c5f7706d1005875c` |
 | Split Allocation | `annotations/splits.json` | Recorded in repository |
 | Adjudication Table | `annotations/adjudication.csv` | Recorded in repository |
@@ -86,7 +100,7 @@ To prevent data leakage during collector evaluation:
 |---|---|---|---|
 | **Title/Copy Groups** | 13 groups (52.0%) | 12 groups (48.0%) | **25 groups** |
 | **Page Episodes** | 37 episodes (52.1%) | 34 episodes (47.9%) | **71 episodes** |
-| **Individual Pages** | 23 pages | 20 pages | **43 pages** |
+| **Individual Pages** | 28 pages | 22 pages | **50 pages** (revised 2026-09-12: 7 cross-title mirror pages, already referenced by occurrences.jsonl, were added to their groups' page catalogs — see correction note above and `audit/A11_INDEPENDENT_VERIFICATION.md`) |
 | **Evidence Propositions** | 35 propositions | 30 propositions | **65 propositions** |
 | **Critical Propositions** | 27 propositions | 22 propositions | **49 propositions** |
 | **Non-Critical Controls** | 8 propositions | 8 propositions | **16 propositions** |
@@ -108,9 +122,15 @@ Every proposition strictly adheres to the 5-tier epistemic rubric frozen in `ann
 
 ## 6. Verification and Handoff
 
-The benchmark can be verified at any time using the automated audit script:
+The benchmark can be verified at any time using the automated audit scripts:
 ```powershell
 py audit/verify_annotations.py
+py audit/verify_a11_independent.py
 ```
 
-**Status**: Ticket A11 is complete. Downstream tickets **E12 (Evidence Evaluator)** and **X13 (Sweep Execution)** are fully unblocked.
+**Status**: Ticket A11 is delivered and independently re-verified from scratch: 14/14 checks pass in
+`audit/A11_INDEPENDENT_VERIFICATION.md` (hashes, spans, adjudication completeness, split/group-catalog completeness,
+and the previously-flagged epistemic-leakage prose all confirmed closed). It does **not** by itself unblock **E12**
+or **X13** — both remain gated by `docs/PRE_RESULTS_AUDIT.md` §11's full register (A01–A05 for E12, including A04's
+retained-only snapshot boundary; a separate GO plus X01–X05/S01–S05 for X13). A03/A11's own mechanical scope is
+closed; the remaining gates are tracked in `docs/PROJECT_STATUS.md`.

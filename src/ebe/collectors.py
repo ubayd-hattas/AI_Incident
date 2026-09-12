@@ -101,6 +101,28 @@ class CaptureAttempt:
 
 
 @dataclass(frozen=True, slots=True)
+class RetainedEvidenceUnit:
+    """A body genuinely retained by ``CaptureStore`` at the final checkpoint snapshot.
+
+    This is the ONLY body-bearing surface a future evidence-coverage evaluator (E12)
+    may treat as retained state. ``CollectorResult.body_results`` and
+    ``.capture_attempts`` are diagnostic/audit history only -- they include every
+    dispatched response and every attempted capture, oversize/evicted/rejected ones
+    included, and must never be used as a stand-in for what the store actually kept.
+    Built exclusively from ``CaptureStore.retained_captures`` plus
+    ``CaptureStore.body_for_capture`` (which itself refuses to return a body for
+    anything not currently retained), so it cannot structurally leak a body the cap
+    ultimately rejected.
+    """
+
+    page_key: str
+    capture_time: datetime
+    request_seq: int
+    body_sha256: str
+    body: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class EventDerivedStats:
     dispatch_times: tuple[datetime, ...]
     max_queue_depth: int
@@ -125,6 +147,7 @@ class CollectorResult:
     peak_discovered_titles: int
     peak_dirty_titles: int
     event_stats: EventDerivedStats | None = None
+    retained_evidence: tuple[RetainedEvidenceUnit, ...] = ()
 
     @property
     def requests_made(self) -> int:
@@ -141,10 +164,14 @@ class CollectorResult:
 
     @property
     def outcome_counts(self) -> tuple[tuple[str, int], ...]:
+        # A response dispatched before the checkpoint can still resolve strictly
+        # after it; from the checkpoint's own vantage point it is not yet a known
+        # outcome. Bucket those as "pending" here too, matching the same fix in
+        # Observer.costs(checkpoint) -- this property must not disagree with it.
         counts = {outcome.value: 0 for outcome in BodyOutcome}
         counts["pending"] = 0
         for result in self.body_results:
-            if isinstance(result, PendingBodyRequest):
+            if isinstance(result, PendingBodyRequest) or result.response_time > self.config.checkpoint:
                 counts["pending"] += 1
             else:
                 counts[result.outcome.value] += 1
@@ -268,6 +295,13 @@ class PeriodicCollector:
             attempts.append(CaptureAttempt(capture, store.admit(capture)))
 
         snapshot = store.snapshot(config.checkpoint)
+        retained_evidence = tuple(
+            RetainedEvidenceUnit(
+                rc.page_key, rc.capture_time, rc.request_seq, rc.body_sha256,
+                store.body_for_capture(rc.request_seq),
+            )
+            for rc in store.retained_captures
+        )
         return CollectorResult(
             config,
             tuple(polls),
@@ -280,6 +314,7 @@ class PeriodicCollector:
             self.observer.discovered_titles,
             peak_discovered,
             peak_dirty,
+            retained_evidence=retained_evidence,
         )
 
     @staticmethod
@@ -423,6 +458,13 @@ class EventDerivedCollector:
         stats = EventDerivedStats(
             tuple(dispatch_times), peak_dirty, coalesced, starved, pending, token_credit
         )
+        retained_evidence = tuple(
+            RetainedEvidenceUnit(
+                rc.page_key, rc.capture_time, rc.request_seq, rc.body_sha256,
+                store.body_for_capture(rc.request_seq),
+            )
+            for rc in store.retained_captures
+        )
         return CollectorResult(
             config,
             tuple(polls),
@@ -436,6 +478,7 @@ class EventDerivedCollector:
             peak_discovered,
             peak_dirty,
             stats,
+            retained_evidence=retained_evidence,
         )
 
     @staticmethod
@@ -490,6 +533,7 @@ __all__ = [
     "PeriodicCollector",
     "PeriodicConfig",
     "PeriodicPolicy",
+    "RetainedEvidenceUnit",
     "periodic_sweep_times",
     "run_periodic",
     "run_event_derived",

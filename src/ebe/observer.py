@@ -227,6 +227,7 @@ class Observer:
         self._outcomes = {outcome: 0 for outcome in BodyOutcome}
         self._pending = 0
         self._downloaded_metadata = 0
+        self._non_body_metadata = 0
         self._downloaded_body = 0
         self._unknown_body_attempts = 0
         self._shared_metadata = 0
@@ -268,6 +269,8 @@ class Observer:
             raise PollScheduleError("poll_time is not on the frozen epoch-aligned schedule")
         if self._last_poll is not None and poll_time <= self._last_poll:
             raise PollScheduleError("feed polls must be strictly increasing and deliver once")
+        if self._directory_requests:
+            raise ObserverError("terminal-directory and continuous-feed access cannot be mixed")
         self._advance_metadata(poll_time)
         self._last_poll = poll_time
         self._feed_requests += 1
@@ -282,6 +285,7 @@ class Observer:
         payload_values = [record.as_dict() for record in visible]
         response = canonical_array(payload_values)
         self._downloaded_metadata += len(response)
+        self._non_body_metadata += len(response)
         for record in visible:
             self._discovered.add(record.page_key)
             self._shared_metadata += len(record.canonical_bytes)
@@ -328,6 +332,11 @@ class Observer:
         request_time = self._horizon_time(request_time, "request_time")
         if self._last_dispatch is not None and request_time < self._last_dispatch:
             raise ObserverTimeError("body requests must be dispatched in nondecreasing time order")
+        if self._last_poll is not None and request_time < self._last_poll:
+            raise ObserverTimeError(
+                "body requests cannot be dispatched earlier than the most recent feed poll "
+                "-- a caller must not use knowledge from a poll that, causally, has not happened yet"
+            )
         self._last_dispatch = request_time
         self._request_seq += 1
         self._body_requests += 1
@@ -387,6 +396,7 @@ class Observer:
         response = canonical_array(list(page_keys))
         self._directory_requests += 1
         self._downloaded_metadata += len(response)
+        self._non_body_metadata += len(response)
         self._shared_metadata += len(response)
         self._peak_shared_metadata = max(self._peak_shared_metadata, self._shared_metadata)
         self._discovered.update(page_keys)
@@ -400,21 +410,56 @@ class Observer:
             if delta < 0:
                 raise ObserverTimeError("checkpoint precedes retained metadata")
             accrued += self._shared_metadata * delta
-        unknown = self._unknown_body_attempts
-        lower = self._downloaded_metadata + self._downloaded_body
+
+        if checkpoint is None:
+            # No checkpoint given: report the observer's own full, unconditional
+            # history (unchanged from before -- every dispatched request that has
+            # actually completed by HORIZON_END is counted).
+            outcomes = self._outcomes
+            pending = self._pending
+            downloaded_metadata = self._downloaded_metadata
+            downloaded_body = self._downloaded_body
+            unknown = self._unknown_body_attempts
+        else:
+            # A response dispatched before `checkpoint` can still resolve strictly
+            # after it (nonzero get_response_delay_us). From the checkpoint's own
+            # vantage point that request is still PENDING -- not yet a known outcome,
+            # not yet a downloaded byte -- even though the observer has, by now,
+            # already computed and cached the real (later) outcome internally.
+            # Recompute every checkpoint-sensitive field from the per-request audit
+            # trail rather than trusting the eager, checkpoint-blind running
+            # counters above, which only ever compared against HORIZON_END.
+            outcomes = {outcome: 0 for outcome in BodyOutcome}
+            pending = 0
+            downloaded_metadata = self._non_body_metadata
+            downloaded_body = 0
+            unknown = 0
+            for record in self._audit:
+                if record.response_time is None or record.response_time > checkpoint:
+                    pending += 1
+                    continue
+                outcome = BodyOutcome(record.outcome)
+                outcomes[outcome] += 1
+                downloaded_metadata += record.header_bytes
+                if outcome is BodyOutcome.BODY:
+                    downloaded_body += record.body_bytes or 0
+                elif outcome is not BodyOutcome.MISSING:
+                    unknown += 1
+
+        lower = downloaded_metadata + downloaded_body
         return ObserverCosts(
             self._feed_requests,
             self._directory_requests,
             self._body_requests,
-            self._outcomes[BodyOutcome.BODY],
-            self._outcomes[BodyOutcome.MISSING],
-            self._outcomes[BodyOutcome.UNKNOWN],
-            self._outcomes[BodyOutcome.BODY_UNKNOWN],
-            self._outcomes[BodyOutcome.AMBIGUOUS],
-            self._outcomes[BodyOutcome.UNSUPPORTED],
-            self._pending,
-            self._downloaded_metadata,
-            self._downloaded_body,
+            outcomes[BodyOutcome.BODY],
+            outcomes[BodyOutcome.MISSING],
+            outcomes[BodyOutcome.UNKNOWN],
+            outcomes[BodyOutcome.BODY_UNKNOWN],
+            outcomes[BodyOutcome.AMBIGUOUS],
+            outcomes[BodyOutcome.UNSUPPORTED],
+            pending,
+            downloaded_metadata,
+            downloaded_body,
             unknown,
             lower,
             None if unknown else lower,

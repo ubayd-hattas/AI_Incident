@@ -185,6 +185,13 @@ check("undiscovered GET does not leak the body even though the save already happ
 
 # ---------------------------------------------------------------------------
 print("=== Q5: cannot retrieve an overwritten trigger body retrospectively ===")
+# NOTE: this test previously dispatched GETs at request_time=t1 *after* a poll
+# already at t2+120s -- i.e. a GET timestamped before a poll that had already
+# happened. That is exactly the causal-ordering violation X02 identified and
+# Observer.get_body now correctly rejects (a real collector never does this;
+# dispatch is always causally ordered after the polls that discovered a page).
+# Rewritten to dispatch causally (request_time == the poll that just ran, or
+# later), while still testing the same property via response delay alone.
 t1 = HORIZON_START + timedelta(seconds=600)
 t2 = t1 + timedelta(seconds=60)
 revA1 = make_revision("dse~C@1", "dse~C", "C", t1.isoformat().replace("+00:00", ".000000Z"), "OLD_BODY", 1)
@@ -193,18 +200,17 @@ evA1 = make_save_event("save:dse~C@1", "dse~C", "C", t1.isoformat().replace("+00
 evA2 = make_save_event("save:dse~C@2", "dse~C", "C", t2.isoformat().replace("+00:00", ".000000Z"), "dse~C@2")
 export3 = make_export([revA1, revA2], [evA1, evA2])
 obs5 = Observer(export3, config=ObserverConfig(feed_publication_lag_us=0, get_response_delay_us=0))
-obs5.poll_feed(t2 + timedelta(seconds=120))  # discover the page well after both saves
-# Dispatch a GET *as if* triggered by the FIRST save's event (request_time = t1),
-# with zero delay so response_time == t1 -- this must see OLD_BODY, not a future peek.
-r_at_trigger = obs5.get_body("dse~C", t1)
+obs5.poll_feed(t1)  # discover the page exactly at the first save's own time, causally
+r_at_trigger = obs5.get_body("dse~C", t1)  # dispatched AT the poll that discovered it -- causally valid
 check("GET dispatched at the first trigger's own time sees the body current AT THAT TIME (old), not the future replacement", r_at_trigger.body == b"OLD_BODY", str(r_at_trigger.body))
-# Now dispatch a second GET whose REQUEST is nominally "for" the same page but
-# with a response delay pushing response_time past t2 -- this must see NEW_BODY,
-# proving the observer never returns a cached/trigger-tied old body once time
-# has moved past the overwrite, i.e. no retrospective replay of a stale capture.
+# Now dispatch a second GET, still causally ordered (request_time == the poll
+# that discovered the page, no earlier), but with a response delay pushing its
+# OWN response_time past t2 -- this must see NEW_BODY, proving the observer
+# never returns a cached/trigger-tied old body once time has moved past the
+# overwrite, i.e. no retrospective replay of a stale capture.
 obs6 = Observer(export3, config=ObserverConfig(feed_publication_lag_us=0, get_response_delay_us=int((t2 - t1).total_seconds() * 1_000_000) + 1_000_000))
-obs6.poll_feed(t2 + timedelta(seconds=120))
-r_after_overwrite = obs6.get_body("dse~C", t1)  # dispatched at t1, but response lands after t2
+obs6.poll_feed(t1)
+r_after_overwrite = obs6.get_body("dse~C", t1)  # dispatched causally at t1, but its OWN delay lands the response after t2
 check("GET whose response completes AFTER an overwrite sees the NEW body, never the stale trigger body", r_after_overwrite.body == b"NEW_BODY", str(r_after_overwrite.body))
 
 # ---------------------------------------------------------------------------
@@ -215,7 +221,7 @@ evD_save = make_save_event("save:dse~D@1", "dse~D", "D", t3.isoformat().replace(
 evD_delete = make_delete_event("delete:dse~D", "dse~D", "D", (t3 + timedelta(seconds=10)).isoformat().replace("+00:00", ".000000Z"))
 export4 = make_export([revD], [evD_save, evD_delete])
 obs7 = Observer(export4, config=ObserverConfig(feed_publication_lag_us=0))
-obs7.poll_feed(t3 + timedelta(seconds=120))
+obs7.poll_feed(t3)  # causally valid: no GET below is dispatched earlier than this poll
 before_costs = obs7.costs()
 r_body = obs7.get_body("dse~D", t3)  # BODY
 r_missing = obs7.get_body("dse~D", t3 + timedelta(seconds=20))  # MISSING (deleted)
@@ -351,7 +357,7 @@ evF1 = make_save_event("save:dse~F@1", "dse~F", "F", tie_iso, "dse~F@1")
 evF2 = make_save_event("save:dse~F@2", "dse~F", "F", tie_iso, "dse~F@2")
 export_tie = make_export([revF1, revF2], [evF1, evF2])
 obs_tie = Observer(export_tie, config=ObserverConfig(feed_publication_lag_us=0))
-obs_tie.poll_feed(t_tie + timedelta(seconds=60))
+obs_tie.poll_feed(t_tie)  # causally valid: GET below is not dispatched earlier than this poll
 resp_tie = obs_tie.get_body("dse~F", t_tie)
 check("a genuine same-timestamp tie surfaces as AMBIGUOUS", resp_tie.outcome is BodyOutcome.AMBIGUOUS, str(resp_tie.outcome))
 check("AMBIGUOUS response carries no body (no silent winner, no union)", resp_tie.body is None)
