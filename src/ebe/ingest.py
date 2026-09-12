@@ -10,9 +10,34 @@ import argparse
 import hashlib
 import json
 from collections import Counter, defaultdict
-from datetime import datetime
+from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from types import MappingProxyType
+from typing import Any, Iterable, Mapping, TypeVar
+
+if __package__:
+    from . import schema as _schema
+else:  # Support the documented ``python src/ebe/ingest.py ...`` invocation.
+    import schema as _schema
+
+BodyEncoding = _schema.BodyEncoding
+DiffHunk = _schema.DiffHunk
+EventRecord = _schema.EventRecord
+ExportedEventType = _schema.ExportedEventType
+ExportFingerprint = _schema.ExportFingerprint
+LabelRecord = _schema.LabelRecord
+ManifestRecord = _schema.ManifestRecord
+NormalizedExport = _schema.NormalizedExport
+ObservedEventSemantics = _schema.ObservedEventSemantics
+PageRecord = _schema.PageRecord
+RelationEdge = _schema.RelationEdge
+RelationFields = _schema.RelationFields
+RelationValue = _schema.RelationValue
+RelationValueForm = _schema.RelationValueForm
+RevisionRecord = _schema.RevisionRecord
+SourceLocation = _schema.SourceLocation
+SourceTimestamp = _schema.SourceTimestamp
 
 
 CORE_FILES = ("pages.jsonl", "revisions.jsonl", "events.jsonl", "labels.jsonl")
@@ -76,6 +101,12 @@ EXPECTED_EVENT_KEYS = {
         "source_refs success_observed".split()
     ),
 }
+EXPECTED_MANIFEST_KEYS = frozenset(
+    "generated_at db_sha256 cut counts per_wiki population_counts "
+    "grade_histograms body_bytes body_encoding page_family_coverage facts "
+    "recreation_source resources tool_versions source_scan request_source_note "
+    "checks".split()
+)
 
 # These tags constrain later loaders; they do not assert undocumented meanings.
 RETROSPECTIVE_FIELDS = {
@@ -110,15 +141,18 @@ def _sha256(path: Path) -> str:
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8", errors="strict", newline="") as handle:
-        for line_no, line in enumerate(handle, 1):
-            try:
-                value = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValidationError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
-            if not isinstance(value, dict):
-                raise ValidationError(f"{path}:{line_no}: expected JSON object")
-            rows.append(value)
+    try:
+        with path.open("r", encoding="utf-8", errors="strict", newline="") as handle:
+            for line_no, line in enumerate(handle, 1):
+                try:
+                    value = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise ValidationError(f"{path}:{line_no}: invalid JSON: {exc}") from exc
+                if not isinstance(value, dict):
+                    raise ValidationError(f"{path}:{line_no}: expected JSON object")
+                rows.append(value)
+    except (OSError, UnicodeError) as exc:
+        raise ValidationError(f"{path}: cannot read strict UTF-8 JSONL: {exc}") from exc
     return rows
 
 
@@ -557,6 +591,476 @@ def validate(raw_dir: Path) -> tuple[dict[str, Any], str]:
 
     report = _render_report(audit)
     return audit, report
+
+
+_MISSING = object()
+T = TypeVar("T")
+
+
+def _fail(source: SourceLocation, message: str) -> ValidationError:
+    place = str(source.file)
+    if source.row_number is not None:
+        place += f":{source.row_number}"
+    if source.identifier is not None:
+        place += f" [{source.identifier}]"
+    return ValidationError(f"{place}: {message}")
+
+
+def _expect(value: Any, kind: type[T], field: str, source: SourceLocation) -> T:
+    # bool is an int subclass; the export contract does not conflate them.
+    if type(value) is not kind:
+        raise _fail(source, f"{field}: expected {kind.__name__}, observed {_type_name(value)}")
+    return value
+
+
+def _nullable(value: Any, kind: type[T], field: str, source: SourceLocation) -> T | None:
+    if value is None:
+        return None
+    return _expect(value, kind, field, source)
+
+
+def _strings(value: Any, field: str, source: SourceLocation) -> tuple[str, ...]:
+    values = _expect(value, list, field, source)
+    for index, item in enumerate(values):
+        _expect(item, str, f"{field}[{index}]", source)
+    return tuple(values)
+
+
+def _freeze(value: Any) -> Any:
+    """Make retained raw JSON immutable without changing scalar information."""
+    if isinstance(value, dict):
+        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _timestamp(value: Any, field: str, source: SourceLocation) -> SourceTimestamp:
+    raw = _expect(value, str, field, source)
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise _fail(source, f"{field}: invalid ISO-8601 timestamp {raw!r}") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise _fail(source, f"{field}: expected timezone-aware timestamp, observed {raw!r}")
+    return SourceTimestamp(raw=raw, utc=parsed.astimezone(timezone.utc))
+
+
+def _nullable_timestamp(value: Any, field: str, source: SourceLocation) -> SourceTimestamp | None:
+    return None if value is None else _timestamp(value, field, source)
+
+
+def _relation_value(value: Any, field: str, source: SourceLocation) -> RelationValue:
+    if value is _MISSING:
+        return RelationValue(RelationValueForm.ABSENT, None)
+    if value is None:
+        return RelationValue(RelationValueForm.NULL, None)
+    if isinstance(value, str):
+        return RelationValue(RelationValueForm.SCALAR, value)
+    if isinstance(value, list):
+        items: list[str | None] = []
+        for index, item in enumerate(value):
+            if item is not None and not isinstance(item, str):
+                raise _fail(source, f"{field}[{index}]: expected string or null, observed {_type_name(item)}")
+            items.append(item)
+        return RelationValue(RelationValueForm.LIST, tuple(items))
+    raise _fail(source, f"{field}: expected null, string, or list, observed {_type_name(value)}")
+
+
+def _broadcast_relation(value: RelationValue, count: int, field: str, source: SourceLocation) -> tuple[str | None, ...]:
+    if value.form is RelationValueForm.LIST:
+        assert isinstance(value.value, tuple)
+        if len(value.value) != count:
+            raise _fail(source, f"{field}: expected {count} aligned values, observed {len(value.value)}")
+        return value.value
+    if value.form is RelationValueForm.SCALAR:
+        assert isinstance(value.value, str)
+        return (value.value,) * count
+    return (None,) * count
+
+
+def _relations(row: Mapping[str, Any], source: SourceLocation) -> RelationFields:
+    related = _relation_value(row.get("related_event_id", _MISSING), "related_event_id", source)
+    relation = _relation_value(row.get("relation_type", _MISSING), "relation_type", source)
+    rounds = _relation_value(row.get("round_id", _MISSING), "round_id", source)
+    if relation.form in {RelationValueForm.ABSENT, RelationValueForm.NULL}:
+        if related.form not in {RelationValueForm.ABSENT, RelationValueForm.NULL}:
+            raise _fail(source, "related_event_id is populated while relation_type is absent/null")
+        return RelationFields(related, relation, rounds, ())
+    if related.form in {RelationValueForm.ABSENT, RelationValueForm.NULL}:
+        raise _fail(source, "relation_type is populated while related_event_id is absent/null")
+    count = len(related.value) if isinstance(related.value, tuple) else 1
+    related_items = _broadcast_relation(related, count, "related_event_id", source)
+    relation_items = _broadcast_relation(relation, count, "relation_type", source)
+    round_items = _broadcast_relation(rounds, count, "round_id", source)
+    edges: list[RelationEdge] = []
+    for index, (relation_type, related_id, round_id) in enumerate(zip(relation_items, related_items, round_items)):
+        if relation_type is None or related_id is None:
+            raise _fail(source, f"relation edge {index}: relation_type and related_event_id must be strings")
+        edges.append(RelationEdge(relation_type, related_id, round_id))
+    return RelationFields(related, relation, rounds, tuple(edges))
+
+
+def _read_manifest(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8", errors="strict"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValidationError(f"{path}: malformed manifest JSON: {exc}") from exc
+    if not isinstance(value, dict):
+        raise ValidationError(f"{path}: expected one JSON object")
+    return value
+
+
+def _check_keys(row: Mapping[str, Any], expected: frozenset[str], source: SourceLocation) -> None:
+    observed = frozenset(row)
+    if observed != expected:
+        raise _fail(
+            source,
+            f"schema keys changed; missing={sorted(expected - observed)}, extra={sorted(observed - expected)}",
+        )
+
+
+def _page(row: dict[str, Any], source: SourceLocation) -> PageRecord:
+    _check_keys(row, EXPECTED_KEYS["pages.jsonl"], source)
+    confidence = row["page_family_confidence"]
+    if confidence is not None and type(confidence) is not float:
+        raise _fail(source, f"page_family_confidence: expected float or null, observed {_type_name(confidence)}")
+    return PageRecord(
+        source, deepcopy(row),
+        _expect(row["page_id"], str, "page_id", source),
+        _expect(row["page_key"], str, "page_key", source),
+        _expect(row["wiki"], str, "wiki", source),
+        _expect(row["name"], str, "name", source),
+        _expect(row["bucket"], str, "bucket", source),
+        _expect(row["page_family"], str, "page_family", source),
+        _nullable(row["page_family_cohort"], str, "page_family_cohort", source),
+        confidence,
+        _nullable(row["page_family_method"], str, "page_family_method", source),
+        _expect(row["page_family_source"], str, "page_family_source", source),
+        _expect(row["n_revs"], int, "n_revs", source),
+        _expect(row["n_revs_before"], int, "n_revs_before", source),
+        _timestamp(row["first_write"], "first_write", source),
+        _timestamp(row["last_write"], "last_write", source),
+        _expect(row["body_bytes"], int, "body_bytes", source),
+        _expect(row["deleted_live"], bool, "deleted_live", source),
+        _expect(row["live_body_variant"], str, "live_body_variant", source),
+        _expect(row["head_differs_from_live"], bool, "head_differs_from_live", source),
+        _expect(row["n_deletions"], int, "n_deletions", source),
+        _expect(row["n_recreations"], int, "n_recreations", source),
+        _strings(row["labels"], "labels", source),
+        _expect(row["n_labels"], int, "n_labels", source),
+        _expect(row["n_ips"], int, "n_ips", source),
+        _expect(row["n_ip16"], int, "n_ip16", source),
+    )
+
+
+def _revision(row: dict[str, Any], source: SourceLocation) -> RevisionRecord:
+    _check_keys(row, EXPECTED_KEYS["revisions.jsonl"], source)
+    encoding_raw = _expect(row["body_encoding"], str, "body_encoding", source)
+    try:
+        encoding = BodyEncoding(encoding_raw)
+    except ValueError as exc:
+        raise _fail(source, f"body_encoding: unsupported encoding {encoding_raw!r}") from exc
+    body = _expect(row["body"], str, "body", source)
+    try:
+        source_bytes = body.encode("latin-1", errors="strict")
+    except UnicodeEncodeError as exc:
+        raise _fail(source, "body: not a byte-preserving Latin-1 projection") from exc
+    classified = BodyEncoding.ASCII
+    if not source_bytes.isascii():
+        try:
+            source_bytes.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            classified = BodyEncoding.LATIN1
+        else:
+            classified = BodyEncoding.UTF8
+    if classified is not encoding:
+        raise _fail(source, f"body_encoding: declared {encoding.value!r}, classified {classified.value!r}")
+    body_len = _expect(row["body_len"], int, "body_len", source)
+    if len(source_bytes) != body_len:
+        raise _fail(source, f"body_len: expected {body_len}, reconstructed {len(source_bytes)}")
+    body_hash = _expect(row["body_sha256"], str, "body_sha256", source)
+    observed_hash = hashlib.sha256(source_bytes).hexdigest()
+    if observed_hash != body_hash:
+        raise _fail(source, f"body_sha256: expected {body_hash}, reconstructed {observed_hash}")
+    raw_hunks = _expect(row["hunks"], list, "hunks", source)
+    hunks: list[DiffHunk] = []
+    hunk_keys = frozenset({"op", "a0", "a1", "b0", "b1"})
+    for index, hunk in enumerate(raw_hunks):
+        if not isinstance(hunk, dict):
+            raise _fail(source, f"hunks[{index}]: expected object, observed {_type_name(hunk)}")
+        _check_keys(hunk, hunk_keys, source)
+        hunks.append(DiffHunk(
+            _expect(hunk["op"], str, f"hunks[{index}].op", source),
+            _expect(hunk["a0"], int, f"hunks[{index}].a0", source),
+            _expect(hunk["a1"], int, f"hunks[{index}].a1", source),
+            _expect(hunk["b0"], int, f"hunks[{index}].b0", source),
+            _expect(hunk["b1"], int, f"hunks[{index}].b1", source),
+        ))
+    return RevisionRecord(
+        source, deepcopy(row),
+        _expect(row["rev_id"], str, "rev_id", source),
+        _expect(row["page_id"], str, "page_id", source),
+        _expect(row["page_key"], str, "page_key", source),
+        _expect(row["wiki"], str, "wiki", source),
+        _expect(row["name"], str, "name", source),
+        _expect(row["seq"], int, "seq", source),
+        _expect(row["rcs_rev"], str, "rcs_rev", source),
+        _expect(row["rcs_path"], str, "rcs_path", source),
+        body, source_bytes, body_len, body_hash, encoding,
+        _expect(row["lines"], int, "lines", source),
+        _nullable(row["diff_base"], str, "diff_base", source),
+        _nullable(row["diff_base_reason"], str, "diff_base_reason", source),
+        tuple(hunks),
+        _expect(row["label"], str, "label", source),
+        _expect(row["ip16"], str, "ip16", source),
+        _timestamp(row["time"], "time", source),
+        _expect(row["time_grade"], str, "time_grade", source),
+        _expect(row["winning_clock"], str, "winning_clock", source),
+        _expect(row["uncertainty_seconds"], int, "uncertainty_seconds", source),
+        _nullable_timestamp(row["request_time"], "request_time", source),
+        _nullable_timestamp(row["success_time"], "success_time", source),
+        _nullable_timestamp(row["recent_changes_time"], "recent_changes_time", source),
+        _timestamp(row["write_date"], "write_date", source),
+        _timestamp(row["archived_at"], "archived_at", source),
+        _nullable(row["request_action"], str, "request_action", source),
+        _nullable(row["change_summary"], str, "change_summary", source),
+        _relations(row, source),
+    )
+
+
+def _event(row: dict[str, Any], source: SourceLocation) -> EventRecord:
+    event_type_raw = _expect(row.get("event_type"), str, "event_type", source)
+    try:
+        event_type = ExportedEventType(event_type_raw)
+    except ValueError as exc:
+        raise _fail(source, f"event_type: unexpected value {event_type_raw!r}") from exc
+    _check_keys(row, EXPECTED_EVENT_KEYS[event_type.value], source)
+    if event_type is ExportedEventType.PROBE:
+        _expect(row["ip16"], str, "ip16", source)
+        _expect(row["request_action"], str, "request_action", source)
+        _expect(row["param_family"], str, "param_family", source)
+        _strings(row["source_refs"], "source_refs", source)
+        _expect(row["success_observed"], bool, "success_observed", source)
+    else:
+        _expect(row["wiki"], str, "wiki", source)
+        _expect(row["page"], str, "page", source)
+        _expect(row["page_key"], str, "page_key", source)
+    if event_type is ExportedEventType.SAVE:
+        _expect(row["revision_ref"], str, "revision_ref", source)
+    elif event_type in {ExportedEventType.DELETE, ExportedEventType.REVERT}:
+        _expect(row["winning_clock"], str, "winning_clock", source)
+        _expect(row["uncertainty_seconds"], int, "uncertainty_seconds", source)
+        _nullable_timestamp(row["request_time"], "request_time", source)
+        _timestamp(row["success_time"], "success_time", source)
+        _nullable_timestamp(row["write_date"], "write_date", source)
+        _nullable_timestamp(row["rcs_date"], "rcs_date", source)
+        _nullable_timestamp(row["recent_changes_time"], "recent_changes_time", source)
+        _nullable(row["clock_delta_seconds"], int, "clock_delta_seconds", source)
+        _expect(row["success_observed"], bool, "success_observed", source)
+        _expect(row["request_action"], str, "request_action", source)
+        _expect(row["change_summary"], str, "change_summary", source)
+        _expect(row["actor_label"], str, "actor_label", source)
+        _expect(row["ip16"], str, "ip16", source)
+        _nullable(row["revision_ref"], str, "revision_ref", source)
+        _expect(row["page_held"], bool, "page_held", source)
+        _strings(row["source_refs"], "source_refs", source)
+        _nullable(row["clock_note"], str, "clock_note", source)
+    semantics = {
+        ExportedEventType.SAVE: ObservedEventSemantics.HELD_BODY_SAVE,
+        ExportedEventType.DELETE: ObservedEventSemantics.SUCCESSFUL_DELETION,
+        ExportedEventType.REVERT: ObservedEventSemantics.BODY_UNKNOWN_FORM_EDIT,
+        ExportedEventType.PROBE: ObservedEventSemantics.NON_MUTATION_PROBE,
+    }[event_type]
+    if event_type is ExportedEventType.REVERT and not (
+        row["revision_ref"] is None and row["request_action"] == "form_edit" and row["success_observed"] is True
+    ):
+        raise _fail(source, "exported revert does not match audited body-unknown successful form_edit shape")
+    def optional(field: str, kind: type[T]) -> T | None:
+        return None if field not in row else _nullable(row[field], kind, field, source)
+    def optional_time(field: str) -> SourceTimestamp | None:
+        return None if field not in row else _nullable_timestamp(row[field], field, source)
+    return EventRecord(
+        source, deepcopy(row), frozenset(row),
+        _expect(row["event_id"], str, "event_id", source), event_type, semantics,
+        _timestamp(row["time"], "time", source),
+        _expect(row["time_grade"], str, "time_grade", source),
+        optional("wiki", str), optional("page", str), optional("page_key", str),
+        optional("revision_ref", str), optional("winning_clock", str),
+        optional("uncertainty_seconds", int), optional_time("request_time"),
+        optional_time("success_time"), optional_time("write_date"),
+        optional_time("recent_changes_time"), optional_time("rcs_date"),
+        optional("clock_delta_seconds", int), optional("clock_note", str),
+        optional("success_observed", bool), optional("request_action", str),
+        optional("change_summary", str), optional("actor_label", str),
+        optional("ip16", str), optional("page_held", bool), optional("param_family", str),
+        _strings(row["source_refs"], "source_refs", source) if "source_refs" in row else (),
+        _relations(row, source),
+    )
+
+
+def _label(row: dict[str, Any], source: SourceLocation) -> LabelRecord:
+    _check_keys(row, EXPECTED_KEYS["labels.jsonl"], source)
+    return LabelRecord(
+        source, deepcopy(row),
+        _expect(row["label"], str, "label", source),
+        _expect(row["is_human_handle"], bool, "is_human_handle", source),
+        _expect(row["stored_revisions"], int, "stored_revisions", source),
+        _timestamp(row["first_write"], "first_write", source),
+        _timestamp(row["last_write"], "last_write", source),
+        _expect(row["stored_revision_ips"], int, "stored_revision_ips", source),
+        _expect(row["stored_revision_ip16"], int, "stored_revision_ip16", source),
+        _expect(row["stored_revision_pages"], int, "stored_revision_pages", source),
+        _strings(row["pages"], "pages", source), _strings(row["wikis"], "wikis", source),
+        _expect(row["save_requests"], int, "save_requests", source),
+        _expect(row["save_request_ips"], int, "save_request_ips", source),
+        _expect(row["save_request_ip16"], int, "save_request_ip16", source),
+        _expect(row["save_request_pages"], int, "save_request_pages", source),
+        _nullable(row["save_request_source"], str, "save_request_source", source),
+    )
+
+
+def _manifest(row: dict[str, Any], source: SourceLocation) -> ManifestRecord:
+    _check_keys(row, EXPECTED_MANIFEST_KEYS, source)
+    def object_field(field: str) -> Mapping[str, Any]:
+        return _freeze(_expect(row[field], dict, field, source))
+    raw_checks = _expect(row["checks"], list, "checks", source)
+    checks: list[Mapping[str, Any]] = []
+    for index, check in enumerate(raw_checks):
+        if not isinstance(check, dict):
+            raise _fail(source, f"checks[{index}]: expected object, observed {_type_name(check)}")
+        checks.append(_freeze(check))
+    return ManifestRecord(
+        source, deepcopy(row), _timestamp(row["generated_at"], "generated_at", source),
+        _expect(row["db_sha256"], str, "db_sha256", source), object_field("cut"),
+        object_field("counts"), object_field("per_wiki"), object_field("population_counts"),
+        object_field("grade_histograms"), object_field("body_bytes"), object_field("body_encoding"),
+        object_field("page_family_coverage"), object_field("facts"), object_field("recreation_source"),
+        object_field("resources"), object_field("tool_versions"), object_field("source_scan"),
+        _expect(row["request_source_note"], str, "request_source_note", source), tuple(checks),
+    )
+
+
+def _unique(records: Iterable[T], key: str, source_name: str) -> Mapping[str, T]:
+    output: dict[str, T] = {}
+    for record in records:
+        value = getattr(record, key)
+        if value in output:
+            source = getattr(record, "source")
+            raise _fail(source, f"duplicate {key} {value!r} in {source_name}")
+        output[value] = record
+    return MappingProxyType(output)
+
+
+def load_export(path: str | Path, *, verify_pinned: bool = True) -> NormalizedExport:
+    """Load and validate the five-file core export without temporal inference.
+
+    ``verify_pinned=False`` exists for small synthetic corruption fixtures.  It
+    disables only the fixed E01 hashes and row totals; schema, body, uniqueness,
+    and linkage validation remain strict.
+    """
+    raw_dir = Path(path)
+    hashes: dict[str, str] = {}
+    for filename in (*CORE_FILES, "manifest.json"):
+        file_path = raw_dir / filename
+        if not file_path.is_file():
+            raise ValidationError(f"{file_path}: missing required file")
+        observed = _sha256(file_path)
+        hashes[filename] = observed
+        if verify_pinned and observed != EXPECTED_HASHES[filename]:
+            raise ValidationError(
+                f"{file_path}: SHA-256 mismatch; expected {EXPECTED_HASHES[filename]}, observed {observed}"
+            )
+    raw_rows = {filename: _read_jsonl(raw_dir / filename) for filename in CORE_FILES}
+    if verify_pinned:
+        for filename, expected in EXPECTED_ROWS.items():
+            observed = len(raw_rows[filename])
+            if observed != expected:
+                raise ValidationError(f"{raw_dir / filename}: row count mismatch; expected {expected}, observed {observed}")
+
+    pages = tuple(
+        _page(row, SourceLocation(raw_dir / "pages.jsonl", index, row.get("page_id")))
+        for index, row in enumerate(raw_rows["pages.jsonl"], 1)
+    )
+    revisions = tuple(
+        _revision(row, SourceLocation(raw_dir / "revisions.jsonl", index, row.get("rev_id")))
+        for index, row in enumerate(raw_rows["revisions.jsonl"], 1)
+    )
+    events = tuple(
+        _event(row, SourceLocation(raw_dir / "events.jsonl", index, row.get("event_id")))
+        for index, row in enumerate(raw_rows["events.jsonl"], 1)
+    )
+    labels = tuple(
+        _label(row, SourceLocation(raw_dir / "labels.jsonl", index, row.get("label")))
+        for index, row in enumerate(raw_rows["labels.jsonl"], 1)
+    )
+    manifest_path = raw_dir / "manifest.json"
+    manifest = _manifest(_read_manifest(manifest_path), SourceLocation(manifest_path))
+
+    pages_by_id = _unique(pages, "page_id", "pages.jsonl")
+    pages_by_key = _unique(pages, "page_key", "pages.jsonl")
+    revisions_by_id = _unique(revisions, "rev_id", "revisions.jsonl")
+    events_by_id = _unique(events, "event_id", "events.jsonl")
+    labels_by_label = _unique(labels, "label", "labels.jsonl")
+
+    revision_counts: Counter[str] = Counter()
+    for revision in revisions:
+        page = pages_by_key.get(revision.page_key)
+        if page is None:
+            raise _fail(revision.source, f"page_key {revision.page_key!r} does not resolve")
+        if (revision.page_id, revision.wiki, revision.name) != (page.page_id, page.wiki, page.name):
+            raise _fail(revision.source, "revision/page identifiers disagree")
+        revision_counts[revision.page_key] += 1
+    for page in pages:
+        if revision_counts[page.page_key] != page.n_revs:
+            raise _fail(page.source, f"n_revs: declared {page.n_revs}, linked {revision_counts[page.page_key]}")
+
+    save_refs: Counter[str] = Counter()
+    observed_page_keys: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for event in events:
+        if event.event_type is ExportedEventType.PROBE:
+            continue
+        assert event.wiki is not None and event.page is not None and event.page_key is not None
+        observed_page_keys[(event.wiki, event.page)].add(event.page_key)
+        page = pages_by_key.get(event.page_key)
+        if page is not None and (event.wiki, event.page) != (page.wiki, page.name):
+            raise _fail(event.source, "event/page identifiers disagree")
+        if event.event_type is not ExportedEventType.SAVE:
+            if event.page_held is not (page is not None):
+                raise _fail(event.source, f"page_held: expected {page is not None}, observed {event.page_held}")
+        if event.event_type is ExportedEventType.SAVE:
+            assert event.revision_ref is not None
+            revision = revisions_by_id.get(event.revision_ref)
+            if revision is None:
+                raise _fail(event.source, f"revision_ref {event.revision_ref!r} does not resolve")
+            if (event.wiki, event.page, event.page_key, event.time.raw, event.time_grade) != (
+                revision.wiki, revision.name, revision.page_key, revision.time.raw, revision.time_grade
+            ):
+                raise _fail(event.source, "save/revision identity or clock fields disagree")
+            if event.relations != revision.relations:
+                raise _fail(event.source, "save/revision relation fields disagree")
+            save_refs[event.revision_ref] += 1
+        for edge in event.relations.edges:
+            if edge.related_event_id not in events_by_id:
+                raise _fail(event.source, f"relation target {edge.related_event_id!r} does not resolve")
+    for identity, keys in observed_page_keys.items():
+        if len(keys) != 1:
+            raise ValidationError(
+                f"events.jsonl: identity {identity!r} maps to multiple opaque page keys: {sorted(keys)!r}"
+            )
+    for revision in revisions:
+        for edge in revision.relations.edges:
+            if edge.related_event_id not in events_by_id:
+                raise _fail(revision.source, f"relation target {edge.related_event_id!r} does not resolve")
+        count = save_refs[revision.rev_id]
+        if count != 1:
+            raise _fail(revision.source, f"expected exactly one save reference, observed {count}")
+
+    return NormalizedExport(
+        pages, revisions, events, labels, manifest,
+        ExportFingerprint(MappingProxyType(hashes), MappingProxyType({k: len(v) for k, v in raw_rows.items()})),
+        pages_by_id, pages_by_key, revisions_by_id, events_by_id, labels_by_label,
+    )
 
 
 def _render_report(audit: dict[str, Any]) -> str:
