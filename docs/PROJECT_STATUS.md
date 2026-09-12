@@ -8,7 +8,7 @@ How to use this file: section 2 is the thing that keeps changing — check it be
 
 ## 1. One-line status
 
-**Track 2, "Evidence Before Erasure." E01/E05 PASS; E06 FULL PASS (V07); V02 state-model comparisons accepted including a fresh blind re-derivation. R04's pre-E08 accounting contract (`docs/R04_ACCOUNTING_AMENDMENT.md`) is now independently verified — Sam recomputed all nine fixtures from scratch, byte-for-byte and via an independent FIFO/byte-hours simulator, with zero discrepancies after fixing two bugs found in the verification script itself (disclosed in `audit/R04_ACCOUNTING_VERIFICATION.md`). E08 IS AUTHORIZED for observer/storage implementation. No collection-policy results exist yet — that's E08's own implementation work, not yet started. Evidence-label/sample and release gates (A03/A11) are separate and not certified by this.**
+**Track 2, "Evidence Before Erasure." E01/E05 PASS; E06 FULL PASS (V07); V02 state-model comparisons accepted including a fresh blind re-derivation. R04's pre-E08 accounting contract (`docs/R04_ACCOUNTING_AMENDMENT.md`) is independently verified. E08 observer/storage is implemented and passes the full offline suite (56 tests plus 3 subtests); all nine accounting fixtures reproduce exactly. No E09/E10 collection-policy results exist. Evidence-label/sample and release gates (A03/A11) are separate and not certified by this.**
 
 ### Current E08 authorization gate
 
@@ -49,14 +49,14 @@ Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check 
 | E05 | Ubayd | Typed validated loader | ✅ **Done** | `src/ebe/schema.py` + extended `ingest.py`, `docs/E05_TYPED_LOADER.md`, `tests/test_ingest.py`. Correctly types `revert` as body-unknown, never restoration. One gap from the E01 review still open: manifest `never_add_to`/`population_id` constraints are loaded as an opaque field, not enforced anywhere. |
 | E06 | Ubayd | Timeline/state-at-time engine | ✅ **Implemented; state dependency sufficient for next ticket** | `src/ebe/timeline.py`, `docs/E06_TIMELINE_ENGINE.md`; V07 records no found state divergences with disclosed limitations. |
 | V07 | Sam | Independent state reference/checks | ✅ **FULL PASS** (revised from CONDITIONAL) | `audit/V07_BLIND_VALIDATION.md` §6, `audit/independent_replay.py`, `audit/reconstruction_checks.csv`, `audit/V07_SECOND_BLIND_RECONSTRUCTION.md`. The two gaps that held this at CONDITIONAL are both closed: the `data/data/raw/export` path bug is fixed (`b1c822e`), and a second, zero-prior-exposure blind reconstruction now confirms every boundary. Does not verify accounting bytes — that's the separate, still-open E08 accounting-fixture acceptance below. |
-| E08 | Ubayd | Shared observer/storage | 🟢 **AUTHORIZED; not yet implemented** | Accounting amendment independently accepted (`audit/R04_ACCOUNTING_VERIFICATION.md`, 9/9 fixtures). Ubayd may now start observer/storage code against the frozen schema. |
+| E08 | Ubayd | Shared observer/storage | ✅ **Implemented; local verification PASS** | `src/ebe/{accounting,observer,storage}.py`, `tests/test_{observer,storage}.py`, and `docs/E08_OBSERVER_STORAGE.md`. Full suite: 56 tests + 3 subtests; independent accounting script: 9/9 fixtures. |
 | E09–E10 | Ubayd | Periodic/event-derived collectors | ⬜ **Not implemented, not authorized** | Await E08 and their own contract/test gates; no policy runs or outcomes. |
 | A11 | Alex/Aaron/Jaswin | Freeze benchmark evidence, blind to policy outputs | ⬜ Not started, blocked on A03 |
 | E12 | Ubayd, Sam review | Evidence-coverage/delay evaluator | ⬜ Not started |
 | X13 | Ubayd + Sam | Pinned sweep, clean-environment reproduction | ⬜ Not started |
 | P14 | Jaswin + Alex | Judge-facing artifact (figure + one history panel + README) | ⬜ Not started |
 
-**Plain read:** the state engine exists and V07 permits moving past that dependency. The immediate E08 blocker is now **independent acceptance of the completed accounting fixtures**, not absent state-engine code. Accounting documentation alone does not grant authorization.
+**Plain read:** E08's shared observer/storage substrate is implemented against the independently accepted accounting contract. E09/E10 remain separate, not authorized, and unimplemented.
 
 ---
 
