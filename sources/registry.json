@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "id": "collusion-wiki-core-export-2026-09-03",
+      "documentation_url": "https://collusion.wiki/explorer/download",
+      "download_url": "https://collusion.wiki/explorer/download/full-wiki-logs.zip",
+      "retrieved_at_utc": "2026-09-12T11:50:46Z",
+      "archive_sha256": "eb68aa12d26bf189d8bfc4ce47f4d8af66ae5ba7ebadd429738297a3cbb25ae",
+      "manifest_generated_at": "2026-09-03T03:42:36Z",
+      "source_database_sha256": "199241bf9e0b38b58764cf1545680de8fec8896db034050bde145e3b6f6ce0bb",
+      "population": "Five-file core export only; revision.write_date >= 2026-05-01",
+      "expanded_checksums_file": "sources/SHA256SUMS",
+      "terms": {
+        "status": "unresolved",
+        "note": "Public download availability is not treated as a blanket reuse license. Confirm export, excerpt, annotation, and redistribution terms with the maintainers."
+      }
+    }
+  ]
+}
+
