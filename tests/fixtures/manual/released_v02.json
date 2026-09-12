@@ -1,0 +1,57 @@
+{
+  "release": "V02 packets 01, 02, 03, 05, 06, and 07 only",
+  "cases": [
+    {
+      "packet": "01",
+      "page_key": "dse~DataUSAConstructionWageSep18Live",
+      "revision_range": [1, 30],
+      "deletions": ["delete:dse:rclog:145609"],
+      "archive_no_ops": [
+        ["2026-06-19T14:19:47Z", "dse~DataUSAConstructionWageSep18Live@29"],
+        ["2026-06-19T15:46:25Z", "dse~DataUSAConstructionWageSep18Live@30"]
+      ]
+    },
+    {
+      "packet": "02",
+      "page_key": "dse~ZZZDataUSAConstructionWageLive",
+      "revision_range": [1, 10],
+      "deletions": ["delete:dse:rclog:145611"],
+      "archive_no_ops": [
+        ["2026-06-19T14:41:48Z", "dse~ZZZDataUSAConstructionWageLive@9"]
+      ]
+    },
+    {
+      "packet": "03",
+      "page_key": "dse~AgentLinkma21JuneAA",
+      "revision_range": [1, 20],
+      "deletions": ["delete:dse:rclog:138648", "delete:dse:rclog:151031"],
+      "archive_no_ops": [
+        ["2026-06-18T19:50:33Z", "dse~AgentLinkma21JuneAA@20"]
+      ]
+    },
+    {
+      "packet": "05",
+      "page_key": "dse~TestFoobaAgent",
+      "revision_range": [1, 5],
+      "deletions": ["delete:dse:rclog:131972", "delete:dse:rclog:151010"],
+      "archive_no_ops": []
+    },
+    {
+      "packet": "06",
+      "page_key": "dse~OpenAIDataUSAPoliceBridge20260129",
+      "revision_range": null,
+      "deletions": ["delete:dse:rclog:145962", "delete:dse:rclog:146157"],
+      "body_unknown": ["revert:delete:dse:rclog:145962"],
+      "archive_no_ops": []
+    },
+    {
+      "packet": "07",
+      "page_key": "dse~AgentOfficialDirectQueryAA3",
+      "revision_range": [1, 1],
+      "deletions": ["delete:dse:rclog:150767"],
+      "archive_no_ops": [
+        ["2026-06-24T10:43:34Z", "dse~AgentOfficialDirectQueryAA3@1"]
+      ]
+    }
+  ]
+}

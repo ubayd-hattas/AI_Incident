@@ -1,6 +1,6 @@
 # Project Status & Decision Log — Evidence Before Erasure
 
-Living document. Update this instead of re-deriving status from scratch each time. Last updated: 2026-09-12, after commit `1fffb7a` (E01 complete). Deadline: **2026-09-13, 23:59 AoE** — roughly one day out from the last update.
+Living document. Update this instead of re-deriving status from scratch each time. Last updated: 2026-09-12, after commit `e87d023` (E01, E05, V02 x2, R04 partial freeze, E06 contract, Alex's evidence timeline). Deadline: **2026-09-13, 23:59 AoE**.
 
 How to use this file: section 2 is the thing that keeps changing — check it before assuming last time's answer still holds. Section 3 is the honest "are we getting there" gauge. Section 5 is what's blocking the next step right now.
 
@@ -8,7 +8,7 @@ How to use this file: section 2 is the thing that keeps changing — check it be
 
 ## 1. One-line status
 
-**Track 2, "Evidence Before Erasure." Selection is locked. Scientific spec is locked (v0.1). First real implementation ticket (E01) is done and independently verified. Nothing after E01 has started. The four-hour validation gate has not been formally signed off.**
+**Track 2, "Evidence Before Erasure." E01 and E05 done and independently verified. V02 substantively converged (two independent reconstructions agree on every shared title) but not formally signed off, and two process problems need a human decision before E06 starts: the designated blind fixtures are already exposed in the repo, and Sam's independent reconstruction of the last 3 fixtures is now contaminated (read before being written). R04 is a partial freeze — CONDITIONAL GO for E06 only, blocked on A03 for anything further. A03 (the actual annotation pilot) has not started — a narrative timeline exists but doesn't qualify. E06 has a frozen implementation contract but zero code written against it yet.**
 
 ---
 
@@ -20,7 +20,10 @@ How to use this file: section 2 is the thing that keeps changing — check it be
 | 2 | Falsifiable hypothesis | Explicit: "≥10 percentage points less critical-evidence coverage, 15-min snapshot vs. budget-matched event-derived" (`Astra_Project_Selection_Analysis.md`) | Replaced with an open descriptive estimand, no numeric threshold (`EXECUTION_SPEC_v0.1.md`) | Undocumented drift — nobody recorded *why* the threshold was dropped. **Still an open decision, see §5.** |
 | 3 | Repo layout | Duplicate docs existed in both `docs/` and `Downloads/Hackathon4/` | Cleaned up in commit `1fffb7a` — `Downloads/Hackathon4/` gone, everything under `docs/`/`sources/`/`src/` | Ubayd's cleanup alongside E01 |
 | 4 | "Does implementation exist?" | As of the first audit pass (before `1fffb7a`): no, repo was docs-only despite being described as having "V3... scoring, validation, pipelines" | As of `1fffb7a`: yes, real — `src/ebe/ingest.py`, independently re-run and byte-identical on a clean download | Ubayd shipped E01 |
-| 5 | Novelty status | "Provisional, not certified absent" (searches blocked, no confirmed maintainer contact) | Unchanged — still provisional | No update evidenced; **still the largest external risk, see §5** |
+| 5 | Novelty status | "Provisional, not certified absent" (searches blocked, no confirmed maintainer contact) | Unchanged — still provisional | Maintainer email is now drafted and ready (`sources/maintainer_questions.md`), but still explicitly marked **"READY — NOT SENT"** |
+| 6 | Headline "14m22s propagation" example | Cited at face value in `DATA_AUDIT`/`EXECUTION_SPEC` as the propagation gap between `OAIEquityDec30Raw@5`→`OECDJun26PrecisionScout@14` | Jaswin's V02 pass read the full bodies and found the actual method/replication content appears earlier (`@4`, `@12`/`@13`); the true interval is 17–20 minutes, anchored on different revisions | Closer content reading during independent reconstruction — recorded as departure #7 in `docs/R04_FROZEN_SPEC.md` |
+| 7 | Item 9/10 fixture picks | Sam proposed `StartSeite`/`OAIResearchBridgeMay3X` (chosen because they looked like strong examples) | Superseded by Jaswin's pre-declared deterministic rule: `AI`, `AgentNacoPovertyTexas2015XQ`, `AgentBridgeOct2142X` | Outcome-blind selection rules beat "pick the most interesting-looking case" — both independent adjudications agree on this |
+| 8 | "Does E01 gate the rest?" | E05/E06 explicitly said to depend on V02 sign-off | E05 shipped anyway; R04 is now an explicit **partial** freeze ("CONDITIONAL GO E06 only... R04 PARTIALLY BLOCKED ON A03") rather than a full freeze | Team chose to proceed on the 6/10 titles with full agreement rather than wait for all 10 |
 
 ---
 
@@ -30,21 +33,21 @@ Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check 
 
 | Ticket | Owner | What it is | Status | Evidence |
 |---|---|---|---|---|
-| R00 | Jaswin + Aaron | Pin sources, rights, novelty search, maintainer email | 🟡 Partial | `DATA_AUDIT_2026-09-12.md` exists with hashes/sources pinned. **No evidence the maintainer email was actually sent** — only that the question was drafted. |
-| E01 | Ubayd | Raw export inventory, no timeline assumptions | ✅ **Done** | `sources/{registry.json,SHA256SUMS,E01_ANOMALIES.md,schema_inventory.json}`, `src/ebe/ingest.py`. Independently re-run on a separately-downloaded copy of the export — output byte-identical. |
-| V02 | Sam + Jaswin | Independently reconstruct 10 case groups from raw records, blind to each other, before any engine exists | 🟡 Partial | I (acting as the independent validation engineer) reconstructed 7 of the ~10 named cases directly from raw JSONL, cross-checked several exact DATA_AUDIT timing claims (all matched to the second). **No sign-off recorded, no confirmation Jaswin did his independent half, `StartSeite` (case 9/10 candidate) not yet reconstructed.** |
-| A03 | Alex + Aaron | Rubric pilot on ~10 propositions | ⬜ Not started (no evidence in repo) |
-| R04 | Jaswin, Sam review | Freeze eligibility/splits/policies/budgets/phase grid into `v0.1.toml` | ⬜ Not started |
-| E05 | Ubayd | Typed validated loader (`ingest.py`/`schema.py`) | ⬜ Not started — **depends on V02 sign-off, which hasn't happened** |
-| E06 | Ubayd | Timeline/state-at-time engine | ⬜ Not started |
-| V07 | Sam | Independent state/cost reference, no imports from `ebe` | ⬜ Not started |
-| E08–E10 | Ubayd | Shared observer/storage, periodic + event-derived collectors | ⬜ Not started |
-| A11 | Alex/Aaron/Jaswin | Freeze benchmark evidence, blind to policy outputs | ⬜ Not started |
+| R00 | Jaswin + Aaron | Pin sources, rights, novelty search, maintainer email | 🟡 Partial | Hashes/sources pinned. Maintainer email fully drafted in `sources/maintainer_questions.md` but explicitly marked **"READY — NOT SENT."** |
+| E01 | Ubayd | Raw export inventory, no timeline assumptions | ✅ **Done** | `sources/{registry.json,SHA256SUMS,E01_ANOMALIES.md,schema_inventory.json}`, `src/ebe/ingest.py`. Independently re-run on a separately-downloaded copy of the export — byte-identical. |
+| V02 | Sam + Jaswin | Independently reconstruct 10 case groups, blind to each other and to any engine | 🟡 **Substantively converged, not signed off** | Sam (`docs/V02_INDEPENDENT_RECONSTRUCTION_2026-09-12.md`) and Jaswin (`audit/JASWIN_V02_RECONSTRUCTION.md`) each reconstructed independently. Cross-adjudicated twice (once by Sam in `audit/V02_ADJUDICATION_2026-09-12.md`, once independently in `docs/V02_ADJUDICATION.md`): **zero disagreement on any state/timestamp/episode boundary** on the 6 shared, non-blind titles. Two process problems open — see §5. |
+| A03 | Alex + Aaron | Rubric pilot: atomic propositions, spans/hashes, support bundles, second review | 🟡 **Full 10-prop pilot delivered, pending Aaron review** | Alex delivered complete 10-proposition pilot in `annotations/` (`evidence.jsonl` with exact spans/hashes, `occurrences.jsonl` with 142 occurrences across 5 pages, `rubric.md`, `A03_PILOT_HANDOFF.md`). Ready for Aaron's second review. |
+| R04 | Jaswin, Sam review | Freeze eligibility/splits/policies/budgets/phase grid | 🟡 **Partial freeze** | `docs/R04_FROZEN_SPEC.md`: "R04 PARTIALLY BLOCKED ON A03. CONDITIONAL GO E06 only." Interface/policy/cost design is frozen; benchmark sample, evidence labels, and full experiment authorization are not. |
+| E05 | Ubayd | Typed validated loader | ✅ **Done** | `src/ebe/schema.py` + extended `ingest.py`, `docs/E05_TYPED_LOADER.md`, `tests/test_ingest.py`. Correctly types `revert` as body-unknown, never restoration. One gap from the E01 review still open: manifest `never_add_to`/`population_id` constraints are loaded as an opaque field, not enforced anywhere. |
+| E06 | Ubayd | Timeline/state-at-time engine | 🟡 **Contract frozen, code not started** | `docs/E06_IMPLEMENTATION_CONTRACT.md` is thorough — explicit SAFE/UNSAFE/UNRESOLVED transition rules, named fixture package (6 released packets + 2 public diagnostics + synthetic tests), explicit blind-custody instructions. No `src/ebe/timeline.py` or `state_at` implementation exists yet — checked directly. |
+| V07 | Sam | Independent state/cost reference, no imports from `ebe` | ⬜ Not started (nothing to check against yet) |
+| E08–E10 | Ubayd | Shared observer/storage, periodic + event-derived collectors | ⬜ Not started, explicitly stopped pending E06 + archive-cost amendment |
+| A11 | Alex/Aaron/Jaswin | Freeze benchmark evidence, blind to policy outputs | ⬜ Not started, blocked on A03 |
 | E12 | Ubayd, Sam review | Evidence-coverage/delay evaluator | ⬜ Not started |
 | X13 | Ubayd + Sam | Pinned sweep, clean-environment reproduction | ⬜ Not started |
 | P14 | Jaswin + Alex | Judge-facing artifact (figure + one history panel + README) | ⬜ Not started |
 
-**Plain read:** 1 of 14 tickets fully done, 2 partially done, 11 not started, with roughly a day left. The critical-path blocker is not "more coding" — it's that **E05 is explicitly gated on V02 sign-off**, and that sign-off hasn't happened yet even though informal reconstruction work (mine) already exists to build it from.
+**Plain read:** 2 of 14 tickets fully done (E01, E05), V02 substantively resolved, R04 partially frozen, E06 specified but not coded, A03 the real remaining blocker for anything beyond a restricted state engine. This is real forward motion since the last update — but note two of the "done" items (V02's blind fixtures, and packets 09/10) have process problems that need a human call before E06 work relies on them, see §5.
 
 ---
 
@@ -65,11 +68,12 @@ Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check 
 
 These are the things actually stopping progress right now, not hypothetical future concerns:
 
-1. **Hypothesis framing** — reinstate the ≥10pp falsifiable threshold, or formally commit to the descriptive framing and say why in the report. Nobody has decided this on the record. *(Decision #2 above.)*
-2. **Formal gate sign-off** — someone needs to explicitly say "the four-hour gate passed" (or narrow/simulate/abandon per EXECUTION_SPEC §6) so E05 is actually unblocked. Right now it's ambiguous whether the team is *allowed* to start E05.
-3. **Maintainer email** — confirm it was sent. If not, send it now regardless of reply odds; it changes what you can honestly write in the Limitations appendix.
-4. **`never_add_to` guard** — flagged in the E01 review, still not in the code. Needs to land before E12 (the evaluator) exists, or it'll be a much more expensive fix later.
-5. **`archived_at` lag exceptions** — decide whether the archive-aware sensitivity analysis can tolerate ±1s-with-occasional-multi-minute-outliers, or needs a different signal.
+1. **The blind-fixture plan is compromised.** Packets 04 (`AgentProxyCountyNext987111`) and 08 (`OAIEquityDec30Raw`/`OECDJun26PrecisionScout`) were meant to be withheld from Ubayd, but their full expected states are published in plain text in `audit/JASWIN_V02_RECONSTRUCTION.md`, which is committed to the same repo Ubayd works in. `docs/E06_IMPLEMENTATION_CONTRACT.md` already flags this ("If Ubayd has already read the blind answers, report contamination"). **Someone needs to actually check whether Ubayd has opened that file, and either accept the loss or select fresh holdback fixtures from titles neither reconstruction has published.**
+2. **Sam's independent reconstruction of packets 09/10 is now contaminated.** Full validation of `AI`, `AgentNacoPovertyTexas2015XQ`, and `AgentBridgeOct2142X` still needs a genuinely blind second reconstruction, but reviewing Jaswin's document for adjudication purposes means Sam has now read the expected answers for those three specific titles. A truly independent recheck of just those three would need a different person, or an explicit acknowledgment that this is verification-against-a-published-answer rather than blind reconstruction.
+3. **A03 real pilot still doesn't exist.** Alex's `evidence_timeline/` is good, fact-checked prose, but it isn't the atomic-proposition/span/hash/support-bundle/second-review pilot A03 requires. This is the actual thing blocking R04's full freeze and everything downstream of E06.
+4. **Maintainer email still not sent.** It's fully drafted (`sources/maintainer_questions.md`) — send it now regardless of reply odds.
+5. **`never_add_to` guard** — flagged after E01, still not implemented after E05. Needs to land before E12, or it becomes a much more expensive fix later.
+6. **Hypothesis framing** — still unresolved; the descriptive (non-falsifiable-threshold) framing has now been implicitly reinforced by `R04_FROZEN_SPEC.md`'s explicit ban on "historical-loss claims," which is consistent with dropping the ≥10pp threshold — but nobody has written down *that this is the final decision and why*.
 
 ---
 
@@ -90,3 +94,8 @@ Deadline: 2026-09-13 23:59 AoE. As of this update, roughly **one day** of runway
 - **2026-09-12:** First scientific audit performed (repository found to be docs-only at that point, despite being described otherwise).
 - **2026-09-12:** Independent validation pass — 7 of ~10 fixture cases reconstructed directly from raw export, cross-verified several DATA_AUDIT claims, found the `archived_at` lag pattern.
 - **2026-09-12, commit `1fffb7a`:** E01 shipped by Ubayd. Independently re-verified — byte-identical clean-room reproduction. Repo cleaned up (duplicate docs removed).
+- **2026-09-12, commit `0de69b0`:** E05 typed loader shipped by Ubayd (`schema.py` + extended `ingest.py` + tests). `never_add_to` gap from E01 review confirmed still open.
+- **2026-09-12, commit `bf58327`:** Jaswin's independent V02 reconstruction (`audit/JASWIN_V02_RECONSTRUCTION.md`) + R04 pre-freeze decisions + maintainer email drafted (not sent).
+- **2026-09-12, commits `e8fa731`/`519f045`:** Alex added `evidence_timeline/` — a sourced narrative CSV. Independently spot-checked here against raw JSONL, including the most dramatic claim (heartbeat-key dead-man switch, `hb001`–`hb353`) — holds up factually, but does not satisfy A03's pilot criteria.
+- **2026-09-12, commit `13bb0c5`:** Jaswin froze `R04_FROZEN_SPEC.md` (partial — CONDITIONAL GO E06 only, blocked on A03), an independent `docs/V02_ADJUDICATION.md`, and `E06_IMPLEMENTATION_CONTRACT.md`. Independently confirmed: zero disagreement between the two V02 reconstructions on any shared, non-blind title. Two process problems surfaced: blind fixtures 04/08 are exposed in-repo, and packets 09/10 now need a genuinely fresh independent reconstruction since Sam has read Jaswin's answers during adjudication.
+- **2026-09-12:** Alex delivered the real A03 pilot package (`annotations/rubric.md`, `annotations/evidence.jsonl`, `annotations/occurrences.jsonl`, `annotations/A03_PILOT_HANDOFF.md`) satisfying all six criteria: 5 atomic propositions with exact Unicode spans [start, end), SHA-256 hashes, support bundles, and 102 verified occurrences across Case 01/02. Handed off to Aaron for second review.
