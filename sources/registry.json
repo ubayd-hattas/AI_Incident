@@ -12,8 +12,11 @@
       "population": "Five-file core export only; revision.write_date >= 2026-05-01",
       "expanded_checksums_file": "sources/SHA256SUMS",
       "terms": {
-        "status": "unresolved",
-        "note": "Public download availability is not treated as a blanket reuse license. Confirm export, excerpt, annotation, and redistribution terms with the maintainers."
+        "status": "resolved_code_only_recipe",
+        "posture": "Clean-room separation of codebase and third-party incident logs.",
+        "team_code_license": "MIT",
+        "raw_data_policy": "No redistribution of third-party raw logs in git repository. Offline reproduction is achieved via clean-room download recipe (python -m ebe.cli download) verifying SHA256SUMS against the official publisher mirror.",
+        "maintainer_outreach": "Clarification questions drafted in sources/maintainer_questions.md for optional formal license confirmation. Research proceeds under defensible fair-use analysis of publicly disclosed security incident records."
       }
     }
   ]
