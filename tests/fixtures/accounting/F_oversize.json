@@ -1,0 +1,50 @@
+{
+  "fixture": "F",
+  "name": "Oversize rejection preserves an existing store",
+  "deduplicate": true,
+  "capacity_bytes": 165,
+  "body_texts_in_request_order": ["é", "abc"],
+  "body_utf8_hex_in_request_order": ["c3a9", "616263"],
+  "canonical_packets": [
+    "{\"body_sha256\":\"4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c\",\"capture_time\":\"2026-05-24T00:00:00.000000Z\",\"page_key\":\"dse~A\",\"request_seq\":1}\n",
+    "{\"body_sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\",\"capture_time\":\"2026-05-24T01:00:00.000000Z\",\"page_key\":\"dse~B\",\"request_seq\":2}\n"
+  ],
+  "checkpoint": "2026-05-24T02:00:00.000000Z",
+  "expected": {
+    "packet_bytes_each": 163,
+    "body_bytes_in_request_order": [2, 3],
+    "hash_field_bytes_each_included_in_packet": 80,
+    "extra_object_or_reference_framing_bytes": 0,
+    "standalone_admission_bytes": [165, 166],
+    "admission_results": ["admitted", "oversize"],
+    "store_bytes_after_operations": [0, 165, 165],
+    "evicted_request_seqs": [],
+    "evicted_packet_bytes": 0,
+    "evicted_body_bytes": 0,
+    "retained_request_seqs": [1],
+    "retained_packet_bytes": 163,
+    "retained_body_bytes": 2,
+    "retained_body_objects": 1,
+    "object_reference_counts": [1],
+    "request_count": 2,
+    "successful_body_responses": 2,
+    "admitted_packets": 1,
+    "downloaded_metadata_bytes": 38,
+    "downloaded_body_bytes": 5,
+    "downloaded_total_bytes": 43,
+    "peak_store_bytes": 165,
+    "final_store_bytes": 165,
+    "store_byte_hours": 330
+  },
+  "rejection_audit_facts_not_retained_payload": {
+    "request_seq": 2,
+    "page_key": "dse~B",
+    "request_time": "2026-05-24T01:00:00.000000Z",
+    "response_time": "2026-05-24T01:00:00.000000Z",
+    "outcome": "body",
+    "header_bytes": 19,
+    "body_bytes": 3,
+    "admission": "oversize",
+    "evicted_request_seqs": []
+  }
+}

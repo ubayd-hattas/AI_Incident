@@ -1,6 +1,6 @@
 # Project Status & Decision Log — Evidence Before Erasure
 
-Living document. Update this instead of re-deriving status from scratch each time. Last updated: 2026-09-12, after commit `e87d023` (E01, E05, V02 x2, R04 partial freeze, E06 contract, Alex's evidence timeline). Deadline: **2026-09-13, 23:59 AoE**.
+Living document. Latest checkpoint: pre-E08 accounting amendment and nine hand-counted fixtures completed locally; independent accounting acceptance pending. Earlier dated entries are historical, not current authorization. Deadline recorded in the original plan: **2026-09-13, 23:59 AoE**.
 
 How to use this file: section 2 is the thing that keeps changing — check it before assuming last time's answer still holds. Section 3 is the honest "are we getting there" gauge. Section 5 is what's blocking the next step right now.
 
@@ -8,7 +8,15 @@ How to use this file: section 2 is the thing that keeps changing — check it be
 
 ## 1. One-line status
 
-**Track 2, "Evidence Before Erasure." E01 and E05 done and independently verified. V02 substantively converged (two independent reconstructions agree on every shared title) but not formally signed off, and two process problems need a human decision before E06 starts: the designated blind fixtures are already exposed in the repo, and Sam's independent reconstruction of the last 3 fixtures is now contaminated (read before being written). R04 is a partial freeze — CONDITIONAL GO for E06 only, blocked on A03 for anything further. A03 (the actual annotation pilot) has not started — a narrative timeline exists but doesn't qualify. E06 has a frozen implementation contract but zero code written against it yet.**
+**Track 2, "Evidence Before Erasure." E01/E05 PASS; E06 implemented; V07 clears the state-engine dependency sufficiently for the next ticket with its disclosed process/reproduction limitations. V02 state-model comparisons are accepted through V07. R04's pre-E08 accounting contract is now documented in `docs/R04_ACCOUNTING_AMENDMENT.md`; nine data-only fixtures A–I and their hand arithmetic are complete, and all nine passed author-side local serialization/byte/hash checks. Sam/Aaron independent accounting acceptance is ABSENT. E08 STILL BLOCKED: no observer/storage implementation is authorized. No collection-policy results exist. Evidence-label/sample and release gates are separate; this update does not certify A03/A11.**
+
+### Current E08 authorization gate
+
+- Frozen definitions: metadata JSON serialization, feed/directory/response/packet schemas, canonical body bytes, dedup/FIFO and charged/excluded components.
+- Fixtures: `tests/fixtures/accounting/README.md` plus A_feed, B_unique, C_duplicate, D_nondedup, E_fifo, F_oversize, G_shared_fifo, H_protocol and I_encoding JSON files.
+- Author-side local checks: **9/9 PASS**, including UTF-8 é, Latin-1 transcoding, LF/framing, hashes, NA outcomes, FIFO and byte-hours. No `ebe` imports or future E08 implementation used. These checks are not an independent reviewer signature.
+- Required next: Sam or Aaron independently recomputes and accepts all nine totals and neutrality rules, recording amendment/fixture hashes and review in `audit/R04_ACCOUNTING_VERIFICATION.md`. That acceptance file is absent.
+- **E08 STILL BLOCKED** until explicit acceptance and status authorization. No commit/push or observer/storage/collector/scoring implementation was performed in this accounting step.
 
 ---
 
@@ -35,19 +43,20 @@ Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check 
 |---|---|---|---|---|
 | R00 | Jaswin + Aaron | Pin sources, rights, novelty search, maintainer email | 🟡 Partial | Hashes/sources pinned. Maintainer email fully drafted in `sources/maintainer_questions.md` but explicitly marked **"READY — NOT SENT."** |
 | E01 | Ubayd | Raw export inventory, no timeline assumptions | ✅ **Done** | `sources/{registry.json,SHA256SUMS,E01_ANOMALIES.md,schema_inventory.json}`, `src/ebe/ingest.py`. Independently re-run on a separately-downloaded copy of the export — byte-identical. |
-| V02 | Sam + Jaswin | Independently reconstruct 10 case groups, blind to each other and to any engine | 🟡 **Substantively converged, not signed off** | Sam (`docs/V02_INDEPENDENT_RECONSTRUCTION_2026-09-12.md`) and Jaswin (`audit/JASWIN_V02_RECONSTRUCTION.md`) each reconstructed independently. Cross-adjudicated twice (once by Sam in `audit/V02_ADJUDICATION_2026-09-12.md`, once independently in `docs/V02_ADJUDICATION.md`): **zero disagreement on any state/timestamp/episode boundary** on the 6 shared, non-blind titles. Two process problems open — see §5. |
+| V02 | Sam + Jaswin | Manual state reconstruction/adjudication | ✅ **State-model comparisons accepted through V07** | `audit/V07_BLIND_VALIDATION.md` reports revealed packets 04/08 matched and packets 09/10 accepted. Prior-exposure limitations remain disclosed; this is not a claim of fresh blind-from-birth verification. |
 | A03 | Alex + Aaron | Rubric pilot: atomic propositions, spans/hashes, support bundles, second review | 🟡 **Full 10-prop pilot delivered, pending Aaron review** | Alex delivered complete 10-proposition pilot in `annotations/` (`evidence.jsonl` with exact spans/hashes, `occurrences.jsonl` with 142 occurrences across 5 pages, `rubric.md`, `A03_PILOT_HANDOFF.md`). Ready for Aaron's second review. |
-| R04 | Jaswin, Sam review | Freeze eligibility/splits/policies/budgets/phase grid | 🟡 **Partial freeze** | `docs/R04_FROZEN_SPEC.md`: "R04 PARTIALLY BLOCKED ON A03. CONDITIONAL GO E06 only." Interface/policy/cost design is frozen; benchmark sample, evidence labels, and full experiment authorization are not. |
+| R04 | Jaswin, Sam review | Freeze experiment contract and accounting | 🟡 **Accounting definitions/fixtures complete; independent acceptance pending** | `docs/R04_ACCOUNTING_AMENDMENT.md` fills the pre-E08 accounting deferral without changing numeric policy parameters. Nine fixtures locally checked. Older R04 evidence-label/sample blockers are not adjudicated by this accounting step. |
 | E05 | Ubayd | Typed validated loader | ✅ **Done** | `src/ebe/schema.py` + extended `ingest.py`, `docs/E05_TYPED_LOADER.md`, `tests/test_ingest.py`. Correctly types `revert` as body-unknown, never restoration. One gap from the E01 review still open: manifest `never_add_to`/`population_id` constraints are loaded as an opaque field, not enforced anywhere. |
-| E06 | Ubayd | Timeline/state-at-time engine | 🟡 **Contract frozen, code not started** | `docs/E06_IMPLEMENTATION_CONTRACT.md` is thorough — explicit SAFE/UNSAFE/UNRESOLVED transition rules, named fixture package (6 released packets + 2 public diagnostics + synthetic tests), explicit blind-custody instructions. No `src/ebe/timeline.py` or `state_at` implementation exists yet — checked directly. |
-| V07 | Sam | Independent state/cost reference, no imports from `ebe` | ⬜ Not started (nothing to check against yet) |
-| E08–E10 | Ubayd | Shared observer/storage, periodic + event-derived collectors | ⬜ Not started, explicitly stopped pending E06 + archive-cost amendment |
+| E06 | Ubayd | Timeline/state-at-time engine | ✅ **Implemented; state dependency sufficient for next ticket** | `src/ebe/timeline.py`, `docs/E06_TIMELINE_ENGINE.md`; V07 records no found state divergences with disclosed limitations. |
+| V07 | Sam | Independent state reference/checks | 🟡 **CONDITIONAL PASS; sufficient on state-engine dependency** | `audit/V07_BLIND_VALIDATION.md`, `audit/independent_replay.py`, `audit/reconstruction_checks.csv`. Does not verify accounting bytes. |
+| E08 | Ubayd | Shared observer/storage | ⛔ **STILL BLOCKED; not implemented** | Accounting amendment and nine fixtures exist; independent Sam/Aaron acceptance does not. No observer/storage code authorized. |
+| E09–E10 | Ubayd | Periodic/event-derived collectors | ⬜ **Not implemented, not authorized** | Await E08 and their own contract/test gates; no policy runs or outcomes. |
 | A11 | Alex/Aaron/Jaswin | Freeze benchmark evidence, blind to policy outputs | ⬜ Not started, blocked on A03 |
 | E12 | Ubayd, Sam review | Evidence-coverage/delay evaluator | ⬜ Not started |
 | X13 | Ubayd + Sam | Pinned sweep, clean-environment reproduction | ⬜ Not started |
 | P14 | Jaswin + Alex | Judge-facing artifact (figure + one history panel + README) | ⬜ Not started |
 
-**Plain read:** 2 of 14 tickets fully done (E01, E05), V02 substantively resolved, R04 partially frozen, E06 specified but not coded, A03 the real remaining blocker for anything beyond a restricted state engine. This is real forward motion since the last update — but note two of the "done" items (V02's blind fixtures, and packets 09/10) have process problems that need a human call before E06 work relies on them, see §5.
+**Plain read:** the state engine exists and V07 permits moving past that dependency. The immediate E08 blocker is now **independent acceptance of the completed accounting fixtures**, not absent state-engine code. Accounting documentation alone does not grant authorization.
 
 ---
 
@@ -64,9 +73,9 @@ Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check 
 
 ---
 
-## 5. Open decisions blocking the next real step
+## 5. Earlier open-decision register (historical)
 
-These are the things actually stopping progress right now, not hypothetical future concerns:
+This list predates V07 and the accounting amendment; it is preserved as historical context, not current E08 authorization. V07 discloses and accepts the state-model checks despite prior exposure; the ticket tracker records a delivered A03 pilot, not independent semantic acceptance. The **current** immediate gate is Sam/Aaron accounting acceptance in §1; source/annotation/release limitations remain separate.
 
 1. **The blind-fixture plan is compromised.** Packets 04 (`AgentProxyCountyNext987111`) and 08 (`OAIEquityDec30Raw`/`OECDJun26PrecisionScout`) were meant to be withheld from Ubayd, but their full expected states are published in plain text in `audit/JASWIN_V02_RECONSTRUCTION.md`, which is committed to the same repo Ubayd works in. `docs/E06_IMPLEMENTATION_CONTRACT.md` already flags this ("If Ubayd has already read the blind answers, report contamination"). **Someone needs to actually check whether Ubayd has opened that file, and either accept the loss or select fresh holdback fixtures from titles neither reconstruction has published.**
 2. **Sam's independent reconstruction of packets 09/10 is now contaminated.** Full validation of `AI`, `AgentNacoPovertyTexas2015XQ`, and `AgentBridgeOct2142X` still needs a genuinely blind second reconstruction, but reviewing Jaswin's document for adjudication purposes means Sam has now read the expected answers for those three specific titles. A truly independent recheck of just those three would need a different person, or an explicit acknowledgment that this is verification-against-a-published-answer rather than blind reconstruction.
@@ -77,7 +86,9 @@ These are the things actually stopping progress right now, not hypothetical futu
 
 ---
 
-## 6. Time reality check
+## 6. Earlier time reality check (historical, not a current estimate)
+
+The following planning assessment predates E06/V07 and is not used to authorize implementation.
 
 Deadline: 2026-09-13 23:59 AoE. As of this update, roughly **one day** of runway remains, not the "48 hours" the original schedule in `EXECUTION_SPEC_v0.1.md` §16 assumed (that schedule was written assuming a start point that, based on repo evidence, didn't actually happen until partway through day one). With 1 of 14 tickets done:
 
@@ -88,6 +99,8 @@ Deadline: 2026-09-13 23:59 AoE. As of this update, roughly **one day** of runway
 ---
 
 ## 7. Change log (append here as things move)
+
+- **Pre-E08 accounting recovery checkpoint:** Preserved the existing amendment and A/B work; completed nine data-only accounting fixtures and README. Author-side direct arithmetic plus local standard-library serialization/UTF-8/hash checks passed all nine. No Sam/Aaron acceptance exists, so **E08 STILL BLOCKED**. Updated stale E06/V07 status from their local documents; no source semantics/policy parameters changed, no implementation code created, no commit/push.
 
 - **2026-09-12, early:** Selection memo produced (`Astra_Project_Selection_Analysis.md`), Evidence Before Erasure chosen.
 - **2026-09-12:** `DATA_AUDIT_2026-09-12.md` + `EXECUTION_SPEC_v0.1.md` produced — data-semantics audit and frozen v0.1 spec. Falsifiable hypothesis quietly dropped in this pass.

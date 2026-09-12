@@ -1,0 +1,38 @@
+{
+  "fixture": "E",
+  "name": "FIFO evicts both references before admitting a new body",
+  "deduplicate": true,
+  "capacity_bytes": 328,
+  "body_texts_in_request_order": ["é", "é", "xy"],
+  "body_utf8_hex_in_request_order": ["c3a9", "c3a9", "7879"],
+  "canonical_packets": [
+    "{\"body_sha256\":\"4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c\",\"capture_time\":\"2026-05-24T00:00:00.000000Z\",\"page_key\":\"dse~A\",\"request_seq\":1}\n",
+    "{\"body_sha256\":\"4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c\",\"capture_time\":\"2026-05-24T01:00:00.000000Z\",\"page_key\":\"dse~B\",\"request_seq\":2}\n",
+    "{\"body_sha256\":\"769a4e6d0003189c7e96c5d9b7e810a0d11c3a12832527ec94b0f86d277f51ca\",\"capture_time\":\"2026-05-24T02:00:00.000000Z\",\"page_key\":\"dse~C\",\"request_seq\":3}\n"
+  ],
+  "checkpoint": "2026-05-24T03:00:00.000000Z",
+  "expected": {
+    "packet_bytes_each": 163,
+    "body_bytes_each": 2,
+    "hash_field_bytes_each_included_in_packet": 80,
+    "extra_object_or_reference_framing_bytes": 0,
+    "operation_names": ["initial", "admit_1", "admit_2", "evict_1", "evict_2", "admit_3"],
+    "store_bytes_after_operations": [0, 165, 328, 165, 0, 165],
+    "request_3_candidate_totals_before_each_eviction": [493, 330],
+    "evicted_request_seqs": [1, 2],
+    "evicted_packet_bytes": 326,
+    "evicted_body_bytes": 2,
+    "retained_request_seqs": [3],
+    "retained_packet_bytes": 163,
+    "retained_body_bytes": 2,
+    "retained_body_objects": 1,
+    "object_reference_counts": [1],
+    "request_count": 3,
+    "downloaded_metadata_bytes": 57,
+    "downloaded_body_bytes": 6,
+    "downloaded_total_bytes": 63,
+    "peak_store_bytes": 328,
+    "final_store_bytes": 165,
+    "store_byte_hours": 658
+  }
+}

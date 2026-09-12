@@ -1,0 +1,35 @@
+{
+  "fixture": "A",
+  "name": "Simple feed record",
+  "record": {
+    "action": "live_change",
+    "event_time": "2026-05-24T00:00:00.000000Z",
+    "page_key": "dse~A"
+  },
+  "canonical_record": "{\"action\":\"live_change\",\"event_time\":\"2026-05-24T00:00:00.000000Z\",\"page_key\":\"dse~A\"}\n",
+  "canonical_response": "[{\"action\":\"live_change\",\"event_time\":\"2026-05-24T00:00:00.000000Z\",\"page_key\":\"dse~A\"}]\n",
+  "delivery_time": "2026-05-24T00:01:00.000000Z",
+  "checkpoint": "2026-05-24T01:01:00.000000Z",
+  "expected": {
+    "record_bytes": 87,
+    "packet_bytes": 0,
+    "body_object_bytes": 0,
+    "body_reference_bytes": 0,
+    "peak_store_bytes": 0,
+    "final_store_bytes": 0,
+    "peak_shared_metadata_bytes": 87,
+    "final_shared_metadata_bytes": 87,
+    "shared_metadata_byte_hours": 87,
+    "feed_requests": 1,
+    "downloaded_metadata_bytes": 89,
+    "downloaded_body_bytes": 0,
+    "retained_shared_metadata_bytes": 87,
+    "retained_body_bytes": 0,
+    "empty_response": "[]\n",
+    "empty_poll_requests": 1,
+    "empty_poll_downloaded_metadata_bytes": 3,
+    "empty_poll_retained_metadata_delta": 0,
+    "two_identical_records_response_bytes": 176,
+    "two_identical_records_retained_metadata_bytes": 174
+  }
+}

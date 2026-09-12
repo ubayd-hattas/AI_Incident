@@ -1,0 +1,31 @@
+{
+  "fixture": "H",
+  "name": "Response headers, unknown byte totals and directory framing",
+  "scope": "Isolated response-accounting tests; no capture admission is invoked",
+  "body_responses": [
+    {"outcome": "body", "canonical_header": "{\"outcome\":\"body\"}\n", "header_bytes": 19, "body_utf8_hex": "", "body_bytes": 0, "request_count": 1},
+    {"outcome": "missing", "canonical_header": "{\"outcome\":\"missing\"}\n", "header_bytes": 22, "body_utf8_hex": null, "body_bytes": 0, "request_count": 1},
+    {"outcome": "unknown", "canonical_header": "{\"outcome\":\"unknown\"}\n", "header_bytes": 22, "body_utf8_hex": null, "body_bytes": null, "request_count": 1},
+    {"outcome": "body_unknown", "canonical_header": "{\"outcome\":\"body_unknown\"}\n", "header_bytes": 27, "body_utf8_hex": null, "body_bytes": null, "request_count": 1},
+    {"outcome": "ambiguous", "canonical_header": "{\"outcome\":\"ambiguous\"}\n", "header_bytes": 24, "body_utf8_hex": null, "body_bytes": null, "request_count": 1},
+    {"outcome": "unsupported", "canonical_header": "{\"outcome\":\"unsupported\"}\n", "header_bytes": 26, "body_utf8_hex": null, "body_bytes": null, "request_count": 1}
+  ],
+  "expected_response_totals": {
+    "body_request_count": 6,
+    "downloaded_metadata_bytes": 140,
+    "known_body_bytes_subtotal": 0,
+    "unknown_body_byte_attempts": 4,
+    "downloaded_total_bytes": null,
+    "known_downloaded_byte_lower_bound": 140,
+    "retained_packet_bytes": 0,
+    "retained_body_bytes": 0,
+    "peak_store_bytes": 0,
+    "final_store_bytes": 0,
+    "store_byte_hours": 0
+  },
+  "directory_cases_independent_of_each_other": [
+    {"page_keys": [], "canonical_response": "[]\n", "request_count": 1, "downloaded_metadata_bytes": 3, "peak_shared_metadata_bytes": 3, "final_shared_metadata_bytes": 3, "shared_metadata_byte_hours": 0},
+    {"page_keys": ["dse~A"], "canonical_response": "[\"dse~A\"]\n", "request_count": 1, "downloaded_metadata_bytes": 10, "peak_shared_metadata_bytes": 10, "final_shared_metadata_bytes": 10, "shared_metadata_byte_hours": 0},
+    {"page_keys": ["dse~A", "dse~é"], "canonical_response": "[\"dse~A\",\"dse~é\"]\n", "request_count": 1, "downloaded_metadata_bytes": 19, "peak_shared_metadata_bytes": 19, "final_shared_metadata_bytes": 19, "shared_metadata_byte_hours": 0}
+  ]
+}

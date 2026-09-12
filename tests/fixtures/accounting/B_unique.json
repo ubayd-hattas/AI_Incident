@@ -1,0 +1,37 @@
+{
+  "fixture": "B",
+  "name": "Unique non-ASCII body",
+  "deduplicate": true,
+  "capacity_bytes": 165,
+  "body_text": "é",
+  "body_utf8_hex": "c3a9",
+  "packet": {
+    "body_sha256": "4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c",
+    "capture_time": "2026-05-24T00:00:00.000000Z",
+    "page_key": "dse~A",
+    "request_seq": 1
+  },
+  "canonical_packet": "{\"body_sha256\":\"4a99557e4033c3539de2eb65472017cad5f9557f7a0625a09f1c3f6e2ba69c4c\",\"capture_time\":\"2026-05-24T00:00:00.000000Z\",\"page_key\":\"dse~A\",\"request_seq\":1}\n",
+  "checkpoint": "2026-05-24T01:00:00.000000Z",
+  "expected": {
+    "body_bytes": 2,
+    "packet_bytes": 163,
+    "hash_field_bytes_included_in_packet": 80,
+    "extra_object_or_reference_framing_bytes": 0,
+    "store_bytes_after_operations": [0, 165],
+    "object_reference_counts": [1],
+    "retained_request_seqs": [1],
+    "evicted_request_seqs": [],
+    "request_count": 1,
+    "downloaded_metadata_bytes": 19,
+    "downloaded_body_bytes": 2,
+    "downloaded_total_bytes": 21,
+    "retained_packet_bytes": 163,
+    "retained_body_bytes": 2,
+    "retained_body_objects": 1,
+    "retained_packets": 1,
+    "final_store_bytes": 165,
+    "peak_store_bytes": 165,
+    "store_byte_hours": 165
+  }
+}
