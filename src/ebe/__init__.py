@@ -4,6 +4,14 @@ from .ingest import ValidationError, load_export
 from .schema import NormalizedExport
 from .observer import BodyOutcome, Observer, ObserverConfig
 from .storage import Capture, CaptureStore
+from .collectors import (
+    CollectorResult,
+    PeriodicCollector,
+    PeriodicConfig,
+    PeriodicPolicy,
+    periodic_sweep_times,
+    run_periodic,
+)
 from .timeline import (
     HORIZON_END,
     HORIZON_START,
@@ -21,9 +29,13 @@ __all__ = [
     "BodyOutcome",
     "Capture",
     "CaptureStore",
+    "CollectorResult",
     "NormalizedExport",
     "Observer",
     "ObserverConfig",
+    "PeriodicCollector",
+    "PeriodicConfig",
+    "PeriodicPolicy",
     "OutOfHorizonError",
     "PageState",
     "StateKind",
@@ -32,4 +44,6 @@ __all__ = [
     "ValidationError",
     "build_timeline",
     "load_export",
+    "periodic_sweep_times",
+    "run_periodic",
 ]
