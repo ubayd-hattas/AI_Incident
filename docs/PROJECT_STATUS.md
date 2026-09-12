@@ -1,6 +1,6 @@
 # Project Status & Decision Log — Evidence Before Erasure
 
-Living document. Latest checkpoint: Sam independently recomputed all nine accounting fixtures from scratch (own script, no `ebe` imports, no reuse of author arithmetic) — **9/9 confirmed, E08 AUTHORIZED for observer/storage**. Earlier dated entries are historical, not current authorization. Deadline recorded in the original plan: **2026-09-13, 23:59 AoE**.
+Living document. Latest checkpoint: Ubayd shipped E09 (periodic P/PD/PCD) and E10 (bounded event-derived `E(q)`); Sam independently audited both collectors cross-policy — **PASS, zero bugs found in `src/ebe/collectors.py`** (`audit/E10_CROSS_POLICY_AUDIT.md`). Earlier dated entries are historical, not current authorization. Deadline recorded in the original plan: **2026-09-13, 23:59 AoE**.
 
 How to use this file: section 2 is the thing that keeps changing — check it before assuming last time's answer still holds. Section 3 is the honest "are we getting there" gauge. Section 5 is what's blocking the next step right now.
 
@@ -8,7 +8,7 @@ How to use this file: section 2 is the thing that keeps changing — check it be
 
 ## 1. One-line status
 
-**Track 2, "Evidence Before Erasure." E01/E05 PASS; E06 FULL PASS (V07); V02 state-model comparisons accepted including a fresh blind re-derivation. R04's pre-E08 accounting contract (`docs/R04_ACCOUNTING_AMENDMENT.md`) is independently verified. E08 observer/storage is implemented and passes the full offline suite (56 tests plus 3 subtests); all nine accounting fixtures reproduce exactly. No E09/E10 collection-policy results exist. Evidence-label/sample and release gates (A03/A11) are separate and not certified by this.**
+**Track 2, "Evidence Before Erasure." E01/E05 PASS; E06 FULL PASS (V07); V02 state-model comparisons accepted including a fresh blind re-derivation. R04's pre-E08 accounting contract (`docs/R04_ACCOUNTING_AMENDMENT.md`) is independently verified. E08 observer/storage is implemented and passes the full offline suite (56 tests plus 3 subtests); all nine accounting fixtures reproduce exactly. E09 (P/PD/PCD) and E10 (bounded `E(q)`) are implemented and independently cross-policy audited — PASS, sensor-access parity and accounting parity confirmed, PCD is not artificially weakened relative to E(q), token-bucket arithmetic independently re-derived and matched. Evidence-label/sample and release gates (A03/A11) are separate and not certified by this. E12/X13 (semantic evidence-coverage scoring) remain unimplemented and out of scope for every audit so far.**
 
 ### Current E08 authorization gate
 
@@ -50,13 +50,13 @@ Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check 
 | E06 | Ubayd | Timeline/state-at-time engine | ✅ **Implemented; state dependency sufficient for next ticket** | `src/ebe/timeline.py`, `docs/E06_TIMELINE_ENGINE.md`; V07 records no found state divergences with disclosed limitations. |
 | V07 | Sam | Independent state reference/checks | ✅ **FULL PASS** (revised from CONDITIONAL) | `audit/V07_BLIND_VALIDATION.md` §6, `audit/independent_replay.py`, `audit/reconstruction_checks.csv`, `audit/V07_SECOND_BLIND_RECONSTRUCTION.md`. The two gaps that held this at CONDITIONAL are both closed: the `data/data/raw/export` path bug is fixed (`b1c822e`), and a second, zero-prior-exposure blind reconstruction now confirms every boundary. Does not verify accounting bytes — that's the separate, still-open E08 accounting-fixture acceptance below. |
 | E08 | Ubayd | Shared observer/storage | ✅ **Implemented; local verification PASS** | `src/ebe/{accounting,observer,storage}.py`, `tests/test_{observer,storage}.py`, and `docs/E08_OBSERVER_STORAGE.md`. Full suite: 56 tests + 3 subtests; independent accounting script: 9/9 fixtures. |
-| E09–E10 | Ubayd | Periodic/event-derived collectors | ⬜ **Not implemented, not authorized** | Await E08 and their own contract/test gates; no policy runs or outcomes. |
-| A11 | Alex/Aaron/Jaswin | Freeze benchmark evidence, blind to policy outputs | ⬜ Not started, blocked on A03 |
+| E09–E10 | Ubayd | Periodic/event-derived collectors | ✅ **Implemented; independently cross-policy audited PASS** | `src/ebe/collectors.py` (P/PD/PCD + bounded `E(q)`), `docs/E09_PERIODIC_COLLECTORS.md`, `docs/E10_EVENT_DERIVED_COLLECTOR.md`. `audit/E10_CROSS_POLICY_AUDIT.md` + `audit/verify_collectors_cross_policy.py`: sensor-access parity, accounting parity, independent token-bucket re-derivation (q=30/100/300), nine adversarial scenarios, PCD-vs-E(q) fairness — zero bugs found in the implementation. |
+| A11 | Alex/Aaron/Jaswin | Freeze benchmark evidence, blind to policy outputs | ⬜ Not started — tracker previously said "blocked on A03," but A03 shows Done/Signed off above; this line is stale and needs the team to confirm whether A11 is actually unblocked now |
 | E12 | Ubayd, Sam review | Evidence-coverage/delay evaluator | ⬜ Not started |
 | X13 | Ubayd + Sam | Pinned sweep, clean-environment reproduction | ⬜ Not started |
 | P14 | Jaswin + Alex | Judge-facing artifact (figure + one history panel + README) | ⬜ Not started |
 
-**Plain read:** E08's shared observer/storage substrate is implemented against the independently accepted accounting contract. E09/E10 remain separate, not authorized, and unimplemented.
+**Plain read:** E08's shared observer/storage substrate is implemented against the independently accepted accounting contract, and E09/E10 are now both implemented and independently audited PASS on top of it. The two open threads before P14 can start are: (1) clarify A11's real status (the "blocked on A03" note above is stale now that A03 is signed off), and (2) E12/X13 — the semantic evidence-coverage evaluator and pinned reproduction sweep — have not been started by anyone and are the actual remaining implementation gap before any results/figures can exist.
 
 ---
 
@@ -99,6 +99,8 @@ Deadline: 2026-09-13 23:59 AoE. As of this update, roughly **one day** of runway
 ---
 
 ## 7. Change log (append here as things move)
+
+- **2026-09-12, E09/E10 audit:** Ubayd shipped E09 (`fdcd5b1`) and E10 (`9342cda`). Sam independently cross-policy audited both (`audit/verify_collectors_cross_policy.py`, `audit/E10_CROSS_POLICY_AUDIT.md`): sensor-access parity confirmed by regex over every `self.observer.<attr>` access in `collectors.py` (only `config`/`poll_feed`/`get_body`/`discovered_titles`/`costs` — no trace/revision/annotation access anywhere); an independently-coded token-bucket simulator (never importing `EventDerivedCollector`'s loop) matched the real collector at q=30/100/300 including burst-drain and body-unknown token charging; nine adversarial scenarios (rapid overwrite, save-then-delete, repeated unchanged content, many/one hot pages, many new titles, simultaneous mutations, body-unknown, capacity pressure) all PASS; PCD confirmed not artificially weakened relative to `E(q)` at matched schedule granularity. Zero bugs found in the implementation; five bugs found and fixed in Sam's own test harness (disclosed in the audit doc). Gate: **PASS**. Nothing implemented, no semantic evidence scoring run.
 
 - **Pre-E08 accounting recovery checkpoint:** Preserved the existing amendment and A/B work; completed nine data-only accounting fixtures and README. Author-side direct arithmetic plus local standard-library serialization/UTF-8/hash checks passed all nine. No Sam/Aaron acceptance exists, so **E08 STILL BLOCKED**. Updated stale E06/V07 status from their local documents; no source semantics/policy parameters changed, no implementation code created, no commit/push.
 
