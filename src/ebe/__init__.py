@@ -6,10 +6,14 @@ from .observer import BodyOutcome, Observer, ObserverConfig
 from .storage import Capture, CaptureStore
 from .collectors import (
     CollectorResult,
+    EventDerivedCollector,
+    EventDerivedConfig,
+    EventDerivedStats,
     PeriodicCollector,
     PeriodicConfig,
     PeriodicPolicy,
     periodic_sweep_times,
+    run_event_derived,
     run_periodic,
 )
 from .timeline import (
@@ -30,6 +34,9 @@ __all__ = [
     "Capture",
     "CaptureStore",
     "CollectorResult",
+    "EventDerivedCollector",
+    "EventDerivedConfig",
+    "EventDerivedStats",
     "NormalizedExport",
     "Observer",
     "ObserverConfig",
@@ -45,5 +52,6 @@ __all__ = [
     "build_timeline",
     "load_export",
     "periodic_sweep_times",
+    "run_event_derived",
     "run_periodic",
 ]

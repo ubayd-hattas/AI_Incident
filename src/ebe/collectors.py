@@ -1,4 +1,4 @@
-"""Frozen E09 periodic collectors over the neutral E08 observer boundary.
+"""Frozen E09/E10 collectors over the neutral E08 observer boundary.
 
 This module intentionally knows nothing about trace records, revisions, relations,
 annotations, evidence units, or semantic importance.  Its only view of the modeled
@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Iterator
 
-from .accounting import elapsed_microseconds, require_utc
+from .accounting import MICROSECONDS_PER_HOUR, elapsed_microseconds, require_utc
 from .observer import (
     BodyOutcome,
     BodyResponse,
@@ -31,8 +31,11 @@ from .storage import (
 from .timeline import HORIZON_END, HORIZON_START
 
 
+EVENT_DISPATCH_INTERVAL_US = 60_000_000
+
+
 class CollectorError(RuntimeError):
-    """Base class for invalid E09 collector configurations."""
+    """Base class for invalid collector configurations."""
 
 
 class PeriodicPolicy(str, Enum):
@@ -72,14 +75,45 @@ class PeriodicConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EventDerivedConfig:
+    """Frozen bounded event-derived configuration; ``q`` is attempts per hour."""
+
+    q: int
+    capacity_bytes: int | None = None
+    checkpoint: datetime = HORIZON_END
+
+    def __post_init__(self) -> None:
+        if type(self.q) is not int or self.q <= 0:
+            raise ValueError("q must be a positive integer number of attempts per hour")
+        if self.capacity_bytes is not None and (
+            type(self.capacity_bytes) is not int or self.capacity_bytes < 0
+        ):
+            raise ValueError("capacity_bytes must be a nonnegative integer or None")
+        checkpoint = require_utc(self.checkpoint, "checkpoint")
+        if not HORIZON_START < checkpoint <= HORIZON_END:
+            raise ValueError("checkpoint must be in (HORIZON_START, HORIZON_END]")
+
+
+@dataclass(frozen=True, slots=True)
 class CaptureAttempt:
     capture: Capture
     admission: AdmissionResult
 
 
 @dataclass(frozen=True, slots=True)
+class EventDerivedStats:
+    dispatch_times: tuple[datetime, ...]
+    max_queue_depth: int
+    coalesced_updates: int
+    token_starved_dispatch_opportunities: int
+    pending_dirty_pages: tuple[tuple[datetime, str], ...]
+    final_token_credit_numerator: int
+    token_denominator: int = MICROSECONDS_PER_HOUR
+
+
+@dataclass(frozen=True, slots=True)
 class CollectorResult:
-    config: PeriodicConfig
+    config: PeriodicConfig | EventDerivedConfig
     feed_polls: tuple[FeedPollResult, ...]
     sweep_times: tuple[datetime, ...]
     body_results: tuple[BodyResponse | PendingBodyRequest, ...]
@@ -90,6 +124,7 @@ class CollectorResult:
     discovered_titles: tuple[str, ...]
     peak_discovered_titles: int
     peak_dirty_titles: int
+    event_stats: EventDerivedStats | None = None
 
     @property
     def requests_made(self) -> int:
@@ -287,13 +322,175 @@ def run_periodic(observer: Observer, config: PeriodicConfig) -> CollectorResult:
     return PeriodicCollector(observer, config).run()
 
 
+class EventDerivedCollector:
+    """Run bounded E(q) using only the content-free E08 observer interface."""
+
+    def __init__(self, observer: Observer, config: EventDerivedConfig) -> None:
+        if not isinstance(observer, Observer):
+            raise TypeError("observer must be an E08 Observer")
+        if not isinstance(config, EventDerivedConfig):
+            raise TypeError("config must be an EventDerivedConfig")
+        self.observer = observer
+        self.config = config
+
+    def run(self) -> CollectorResult:
+        config = self.config
+        store = CaptureStore(
+            config.capacity_bytes,
+            deduplicate=True,
+            start_time=HORIZON_START,
+        )
+        dirty: dict[str, datetime] = {}
+        polls: list[FeedPollResult] = []
+        body_results: list[BodyResponse | PendingBodyRequest] = []
+        dispatch_times: list[datetime] = []
+        peak_discovered = 0
+        peak_dirty = 0
+        coalesced = 0
+        starved = 0
+
+        # Credit is represented as numerator / MICROSECONDS_PER_HOUR tokens.
+        # This makes continuous q/hour refill and consumption exact integers.
+        capacity_credit = config.q * MICROSECONDS_PER_HOUR
+        token_credit = capacity_credit
+        last_refill = HORIZON_START
+        poll_step = timedelta(microseconds=self.observer.config.feed_poll_interval_us)
+        dispatch_step = timedelta(microseconds=EVENT_DISPATCH_INTERVAL_US)
+        next_poll = HORIZON_START
+        next_dispatch = HORIZON_START
+
+        while next_poll <= config.checkpoint or next_dispatch < config.checkpoint:
+            if next_poll <= config.checkpoint and (
+                next_dispatch >= config.checkpoint or next_poll <= next_dispatch
+            ):
+                poll = self.observer.poll_feed(next_poll)
+                polls.append(poll)
+                batch_coalesced = self._apply_feed_batch(poll, dirty)
+                coalesced += batch_coalesced
+                peak_discovered = max(peak_discovered, len(self.observer.discovered_titles))
+                peak_dirty = max(peak_dirty, len(dirty))
+                next_poll += poll_step
+                continue
+
+            dispatch_time = next_dispatch
+            dispatch_times.append(dispatch_time)
+            elapsed = elapsed_microseconds(last_refill, dispatch_time)
+            token_credit = min(capacity_credit, token_credit + config.q * elapsed)
+            last_refill = dispatch_time
+
+            while dirty and token_credit >= MICROSECONDS_PER_HOUR:
+                page_key, _pending_time = min(
+                    dirty.items(), key=lambda item: (item[1], item[0])
+                )
+                del dirty[page_key]
+                body_results.append(self.observer.get_body(page_key, dispatch_time))
+                token_credit -= MICROSECONDS_PER_HOUR
+            if dirty and token_credit < MICROSECONDS_PER_HOUR:
+                starved += 1
+            next_dispatch += dispatch_step
+
+        attempts: list[CaptureAttempt] = []
+        completed = sorted(
+            (
+                result for result in body_results
+                if isinstance(result, BodyResponse)
+                and result.outcome is BodyOutcome.BODY
+                and result.response_time <= config.checkpoint
+            ),
+            key=lambda item: (item.response_time, item.request_seq, item.page_key),
+        )
+        for response in completed:
+            assert response.body is not None
+            capture = Capture(
+                response.page_key,
+                response.response_time,
+                response.request_seq,
+                response.body,
+            )
+            attempts.append(CaptureAttempt(capture, store.admit(capture)))
+
+        snapshot = store.snapshot(config.checkpoint)
+        # Refill through the checkpoint for an auditable terminal bucket state,
+        # without creating a forbidden dispatch opportunity at the checkpoint.
+        token_credit = min(
+            capacity_credit,
+            token_credit + config.q * elapsed_microseconds(last_refill, config.checkpoint),
+        )
+        pending = tuple(sorted(
+            ((pending_time, page_key) for page_key, pending_time in dirty.items()),
+            key=lambda item: (item[0], item[1]),
+        ))
+        stats = EventDerivedStats(
+            tuple(dispatch_times), peak_dirty, coalesced, starved, pending, token_credit
+        )
+        return CollectorResult(
+            config,
+            tuple(polls),
+            (),
+            tuple(body_results),
+            tuple(attempts),
+            store.retained_captures,
+            snapshot,
+            self.observer.costs(config.checkpoint),
+            self.observer.discovered_titles,
+            peak_discovered,
+            peak_dirty,
+            stats,
+        )
+
+    @staticmethod
+    def _apply_feed_batch(
+        poll: FeedPollResult,
+        dirty: dict[str, datetime],
+    ) -> int:
+        """Apply same-time groups without treating feed serialization as chronology."""
+
+        coalesced = 0
+        index = 0
+        records = poll.records
+        while index < len(records):
+            record = records[index]
+            end = index + 1
+            while (
+                end < len(records)
+                and records[end].event_time == record.event_time
+                and records[end].page_key == record.page_key
+            ):
+                end += 1
+            group = records[index:end]
+            actions = {item.action for item in group}
+            page_key = record.page_key
+            live_updates = sum(item.action == "live_change" for item in group)
+            if actions == {"delete"}:
+                dirty.pop(page_key, None)
+            else:
+                if page_key in dirty:
+                    coalesced += live_updates
+                else:
+                    dirty[page_key] = record.event_time
+                    coalesced += max(0, live_updates - 1)
+            index = end
+        return coalesced
+
+
+def run_event_derived(observer: Observer, config: EventDerivedConfig) -> CollectorResult:
+    """Convenience entry point for one deterministic bounded E(q) run."""
+
+    return EventDerivedCollector(observer, config).run()
+
+
 __all__ = [
     "CaptureAttempt",
     "CollectorError",
     "CollectorResult",
+    "EventDerivedCollector",
+    "EventDerivedConfig",
+    "EventDerivedStats",
+    "EVENT_DISPATCH_INTERVAL_US",
     "PeriodicCollector",
     "PeriodicConfig",
     "PeriodicPolicy",
     "periodic_sweep_times",
     "run_periodic",
+    "run_event_derived",
 ]
