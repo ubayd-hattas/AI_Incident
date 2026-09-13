@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import hashlib
 from typing import Literal, Mapping, Sequence
 
 Split = Literal["dev", "held_out"]
@@ -16,6 +17,10 @@ class EvaluatorError(RuntimeError):
 
 class DenominatorFirewallError(EvaluatorError):
     """The frozen benchmark population invariants were violated."""
+
+
+class SnapshotIntegrityError(EvaluatorError):
+    """A retained snapshot is internally inconsistent and cannot be scored."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +60,26 @@ class RetainedSnapshot:
             tuple(RetainedFeedRecord(r.page_key, r.action, r.event_time, p.poll_time)
                   for p in result.feed_polls for r in p.records),
         )
+
+
+def validate_snapshot(snapshot: RetainedSnapshot) -> None:
+    """Fail closed if any retained body is not valid at the checkpoint."""
+    issues: list[str] = []
+    for index, record in enumerate(snapshot.bodies):
+        actual_hash = hashlib.sha256(record.body).hexdigest()
+        if actual_hash != record.body_sha256:
+            issues.append(
+                f"body[{index}] {record.page_key!r}: body_sha256 mismatch "
+                f"(supplied {record.body_sha256!r}, recomputed {actual_hash!r})"
+            )
+        if record.capture_time > snapshot.checkpoint:
+            issues.append(
+                f"body[{index}] {record.page_key!r}: capture_time "
+                f"{record.capture_time.isoformat()} is after checkpoint "
+                f"{snapshot.checkpoint.isoformat()}"
+            )
+    if issues:
+        raise SnapshotIntegrityError("; ".join(issues))
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +157,9 @@ class Benchmark:
 
 def validate_population(propositions: Sequence[Proposition], fragments_by_id: Mapping[str, Fragment], *, strict_metadata: bool = False) -> None:
     issues: list[str] = []
+    for fragment_id, fragment in fragments_by_id.items():
+        if not fragment.page_key.startswith("dse~"):
+            issues.append(f"{fragment_id}: fragment page_key is outside DSE universe: {fragment.page_key!r}")
     seen: set[str] = set()
     for prop in propositions:
         if prop.evidence_id in seen:
@@ -145,6 +173,13 @@ def validate_population(propositions: Sequence[Proposition], fragments_by_id: Ma
             for fragment_id in alt:
                 if fragment_id not in fragments_by_id:
                     issues.append(f"{prop.evidence_id}: dangling fragment reference {fragment_id!r}")
+        if prop.eligible:
+            for alt_index, alt in enumerate(prop.core_alternatives):
+                resolved = [fragments_by_id[fragment_id] for fragment_id in alt if fragment_id in fragments_by_id]
+                if len(resolved) == len(alt) and not any(fragment.kind == "body_span" for fragment in resolved):
+                    issues.append(
+                        f"{prop.evidence_id}: core alternative {alt_index} has no body_span fragment"
+                    )
         if prop.critical and prop.eligible and not prop.core_alternatives:
             issues.append(f"{prop.evidence_id}: eligible critical proposition has no core support")
     if issues:
@@ -152,6 +187,7 @@ def validate_population(propositions: Sequence[Proposition], fragments_by_id: Ma
 
 
 def fragment_satisfied(fragment: Fragment, snapshot: RetainedSnapshot) -> tuple[bool, datetime | None]:
+    validate_snapshot(snapshot)
     if fragment.kind == "body_span":
         hits = [r for r in snapshot.bodies if r.page_key == fragment.page_key
                 and (fragment.body_sha256 is None or r.body_sha256 == fragment.body_sha256)
@@ -206,6 +242,7 @@ class CoverageResult:
 
 
 def _coverage(propositions, fragments_by_id, snapshot, *, critical_only: bool, metric: Metric) -> CoverageResult:
+    validate_snapshot(snapshot)
     validate_population(propositions, fragments_by_id)
     scoped = [p for p in propositions if not critical_only or p.critical]
     excluded = tuple(p.evidence_id for p in scoped if not p.eligible)
@@ -237,6 +274,7 @@ class DelayResult:
 
 
 def compute_delay(proposition: Proposition, fragments_by_id: Mapping[str, Fragment], snapshot: RetainedSnapshot) -> DelayResult:
+    validate_snapshot(snapshot)
     if proposition.earliest_eligible_support is None:
         return DelayResult(proposition.evidence_id, "na_unknown_support", None)
     satisfied, acquisition_time = core_covered(proposition, fragments_by_id, snapshot)
@@ -264,6 +302,7 @@ class EvaluationResult:
 
 
 def evaluate_benchmark(benchmark: Benchmark, snapshot: RetainedSnapshot, *, split: EvaluationSplit = "full", metric: Metric = "core", critical_only: bool = False) -> EvaluationResult:
+    validate_snapshot(snapshot)
     benchmark.validation.raise_for_errors()
     validate_population(benchmark.propositions, benchmark.fragments_by_id, strict_metadata=True)
     if split not in ("dev", "held_out", "full") or metric not in ("core", "context"):
@@ -290,6 +329,6 @@ def evaluate_benchmark(benchmark: Benchmark, snapshot: RetainedSnapshot, *, spli
 
 __all__ = ["Alternative", "Benchmark", "CoverageResult", "DelayResult", "DenominatorFirewallError",
            "EvaluationResult", "EvaluatorError", "Fragment", "Proposition", "RetainedBodyRecord",
-           "RetainedFeedRecord", "RetainedSnapshot", "ValidationIssue", "ValidationReport",
+           "RetainedFeedRecord", "RetainedSnapshot", "SnapshotIntegrityError", "ValidationIssue", "ValidationReport",
            "compute_context_coverage", "compute_core_coverage", "compute_delay", "context_covered",
-           "core_covered", "evaluate_benchmark", "fragment_satisfied", "validate_population"]
+           "core_covered", "evaluate_benchmark", "fragment_satisfied", "validate_population", "validate_snapshot"]

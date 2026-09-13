@@ -25,6 +25,7 @@ from ebe.evaluator import (  # noqa: E402
     RetainedBodyRecord,
     RetainedFeedRecord,
     RetainedSnapshot,
+    SnapshotIntegrityError,
     ValidationReport,
     compute_context_coverage,
     compute_core_coverage,
@@ -53,6 +54,14 @@ _NO_RELATION = RelationFields(
 
 def M(minutes: int) -> datetime:
     return HORIZON_START + timedelta(minutes=minutes)
+
+
+def H(body: bytes) -> str:
+    return hashlib.sha256(body).hexdigest()
+
+
+def retained(page_key: str, capture_time: datetime, body: bytes) -> RetainedBodyRecord:
+    return RetainedBodyRecord(page_key, capture_time, body, H(body))
 
 
 def _ts(d: datetime) -> SourceTimestamp:
@@ -131,7 +140,7 @@ class FragmentSatisfactionTests(unittest.TestCase):
     def test_body_span_fragment_satisfied_by_matching_retained_body(self) -> None:
         snapshot = RetainedSnapshot(
             checkpoint=M(10),
-            bodies=(RetainedBodyRecord("dse~A", M(1), b"hello world", "x"),),
+            bodies=(retained("dse~A", M(1), b"hello world"),),
             feed_context=(),
         )
         fragment = Fragment("f1", "dse~A", "body_span", required_substring=b"hello")
@@ -154,6 +163,37 @@ class FragmentSatisfactionTests(unittest.TestCase):
         self.assertEqual(when, M(3))  # delivered_time, not event_time
 
 
+class SnapshotIntegrityTests(unittest.TestCase):
+    def _coverage(self, snapshot: RetainedSnapshot):
+        fragments = {"f": Fragment("f", "dse~A", "body_span", required_substring=b"claim")}
+        proposition = Proposition("P", True, (("f",),))
+        return compute_core_coverage([proposition], fragments, snapshot, critical_only=False)
+
+    def test_correct_hash_is_accepted(self) -> None:
+        result = self._coverage(RetainedSnapshot(M(5), (retained("dse~A", M(1), b"claim"),), ()))
+        self.assertEqual(result.numerator, 1)
+
+    def test_bad_hash_rejects_entire_evaluation(self) -> None:
+        bad = RetainedBodyRecord("dse~A", M(1), b"claim", "0" * 64)
+        with self.assertRaises(SnapshotIntegrityError):
+            self._coverage(RetainedSnapshot(M(5), (bad,), ()))
+
+    def test_capture_at_checkpoint_is_accepted(self) -> None:
+        result = self._coverage(RetainedSnapshot(M(5), (retained("dse~A", M(5), b"claim"),), ()))
+        self.assertEqual(result.numerator, 1)
+
+    def test_capture_one_microsecond_after_checkpoint_is_rejected(self) -> None:
+        future = retained("dse~A", M(5) + timedelta(microseconds=1), b"claim")
+        with self.assertRaises(SnapshotIntegrityError):
+            self._coverage(RetainedSnapshot(M(5), (future,), ()))
+
+    def test_one_corrupt_body_rejects_entire_evaluation(self) -> None:
+        valid = retained("dse~A", M(1), b"claim")
+        unrelated_corrupt = RetainedBodyRecord("dse~UNUSED", M(1), b"other", "bad")
+        with self.assertRaises(SnapshotIntegrityError):
+            self._coverage(RetainedSnapshot(M(5), (valid, unrelated_corrupt), ()))
+
+
 class HandScoredAcceptanceTests(unittest.TestCase):
     """Each case's expected coverage/delay value is computed by hand in the
     test body, never by calling the evaluator and trusting its own output."""
@@ -164,8 +204,8 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         snapshot = RetainedSnapshot(
             checkpoint=M(10),
             bodies=(
-                RetainedBodyRecord("dse~A", M(5), b"the answer is 42", "h1"),
-                RetainedBodyRecord("dse~A", M(2), b"the answer is 42", "h1"),
+                retained("dse~A", M(5), b"the answer is 42"),
+                retained("dse~A", M(2), b"the answer is 42"),
             ),
             feed_context=(),
         )
@@ -183,7 +223,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         # the claim (the fragment's substring is present in that later body).
         snapshot = RetainedSnapshot(
             checkpoint=M(20),
-            bodies=(RetainedBodyRecord("dse~B", M(15), b"prefix text ... the original claim ... suffix", "h2"),),
+            bodies=(retained("dse~B", M(15), b"prefix text ... the original claim ... suffix"),),
             feed_context=(),
         )
         fragments = {"f1": Fragment("f1", "dse~B", "body_span", required_substring=b"the original claim")}
@@ -192,17 +232,17 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         self.assertEqual((result.numerator, result.denominator), (1, 1))
 
     def test_duplicate_occurrence_alternatives_do_not_multiply_proposition(self) -> None:
-        snapshot = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"claim", "h"),), ())
+        snapshot = RetainedSnapshot(M(5), (retained("dse~A", M(2), b"claim"),), ())
         fragments = {"f": Fragment("f", "dse~A", "body_span", required_substring=b"claim")}
         prop = Proposition("P1", True, (("f",), ("f",)))
         result = compute_core_coverage([prop], fragments, snapshot, critical_only=False)
         self.assertEqual((result.numerator, result.denominator), (1, 1))
 
     def test_alternate_occurrence_satisfies_one_proposition(self) -> None:
-        snapshot = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~COPY", M(6), b"same claim", "copy"),), ())
+        snapshot = RetainedSnapshot(M(10), (retained("dse~COPY", M(6), b"same claim"),), ())
         fragments = {
             "original": Fragment("original", "dse~ORIGINAL", "body_span", b"same claim", body_sha256="original"),
-            "copy": Fragment("copy", "dse~COPY", "body_span", b"same claim", body_sha256="copy"),
+            "copy": Fragment("copy", "dse~COPY", "body_span", b"same claim", body_sha256=H(b"same claim")),
         }
         result = compute_core_coverage([Proposition("P1", True, (("original",), ("copy",)))], fragments, snapshot, critical_only=False)
         self.assertEqual((result.numerator, result.denominator), (1, 1))
@@ -213,8 +253,8 @@ class HandScoredAcceptanceTests(unittest.TestCase):
             "b": Fragment("b", "dse~A", "body_span", b"second"),
         }
         prop = Proposition("P1", True, (("a", "b"),))
-        incomplete = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"first only", "x"),), ())
-        complete = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(3), b"first and second", "y"),), ())
+        incomplete = RetainedSnapshot(M(5), (retained("dse~A", M(2), b"first only"),), ())
+        complete = RetainedSnapshot(M(5), (retained("dse~A", M(3), b"first and second"),), ())
         self.assertEqual(compute_core_coverage([prop], fragments, incomplete, critical_only=False).numerator, 0)
         self.assertEqual(compute_core_coverage([prop], fragments, complete, critical_only=False).numerator, 1)
 
@@ -223,7 +263,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         # delete that is NOT present. By hand: core covered, context NOT covered.
         snapshot = RetainedSnapshot(
             checkpoint=M(10),
-            bodies=(RetainedBodyRecord("dse~C", M(1), b"the core claim text", "h3"),),
+            bodies=(retained("dse~C", M(1), b"the core claim text"),),
             feed_context=(),  # no delete observed
         )
         fragments = {
@@ -253,7 +293,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         # is encoding-consistent, which is the minimal thing this substrate
         # can promise).
         body = "the café serves the workaround answer".encode("utf-8")
-        snapshot = RetainedSnapshot(checkpoint=M(5), bodies=(RetainedBodyRecord("dse~D", M(1), body, "h4"),), feed_context=())
+        snapshot = RetainedSnapshot(checkpoint=M(5), bodies=(retained("dse~D", M(1), body),), feed_context=())
         fragments = {"f1": Fragment("f1", "dse~D", "body_span", required_substring="café".encode("utf-8"))}
         prop = Proposition("P1", True, (("f1",),))
         result = compute_core_coverage([prop], fragments, snapshot, critical_only=False)
@@ -314,7 +354,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
     def test_na_unresolved_eligibility_excluded_from_numerator_and_denominator(self) -> None:
         snapshot = RetainedSnapshot(
             checkpoint=M(5),
-            bodies=(RetainedBodyRecord("dse~F", M(1), b"the satisfied claim", "h6"),),
+            bodies=(retained("dse~F", M(1), b"the satisfied claim"),),
             feed_context=(),
         )
         fragments = {"f1": Fragment("f1", "dse~F", "body_span", required_substring=b"satisfied claim")}
@@ -354,7 +394,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
             Proposition("HELD-N", False, (("f",),), split="held_out", group_id="GH"),
         )
         benchmark = Benchmark(props, fragments, ValidationReport(3, 1, 3, ()))
-        snapshot = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"claim", "h"),), ())
+        snapshot = RetainedSnapshot(M(5), (retained("dse~A", M(2), b"claim"),), ())
         result = evaluate_benchmark(benchmark, snapshot, split="held_out", metric="core", critical_only=True)
         self.assertEqual((result.numerator, result.denominator), (1, 1))
         self.assertEqual(result.covered_evidence_ids, ("HELD-C",))
@@ -363,7 +403,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
     def test_agent_report_status_is_preserved_without_affecting_scoring(self) -> None:
         fragment = Fragment("f", "dse~A", "body_span", b"agent says it worked")
         prop = Proposition("P1", True, (("f",),), claim_status="agent-reported action/result")
-        snapshot = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"agent says it worked", "h"),), ())
+        snapshot = RetainedSnapshot(M(5), (retained("dse~A", M(2), b"agent says it worked"),), ())
         self.assertEqual(compute_core_coverage([prop], {"f": fragment}, snapshot, critical_only=False).numerator, 1)
         self.assertEqual(prop.claim_status, "agent-reported action/result")
 
@@ -375,8 +415,8 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         }
         prop = Proposition("P1", True, (("a1", "a2"), ("b",)), earliest_eligible_support=M(1))
         snapshot = RetainedSnapshot(M(10), (
-            RetainedBodyRecord("dse~A", M(8), b"one two", "ha"),
-            RetainedBodyRecord("dse~B", M(4), b"copy", "hb"),
+            retained("dse~A", M(8), b"one two"),
+            retained("dse~B", M(4), b"copy"),
         ), ())
         result = compute_delay(prop, fragments, snapshot)
         self.assertEqual(result.status, "retained")
@@ -397,10 +437,40 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         with self.assertRaises(DenominatorFirewallError):
             validate_population([prop], {})
 
+    def test_population_firewall_accepts_dse_body_only(self) -> None:
+        fragments = {"body": Fragment("body", "dse~Page", "body_span", b"claim")}
+        validate_population([Proposition("P", True, (("body",),))], fragments)
+
+    def test_population_firewall_accepts_body_plus_feed(self) -> None:
+        fragments = {
+            "body": Fragment("body", "dse~Page", "body_span", b"claim"),
+            "feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete"),
+        }
+        validate_population([Proposition("P", True, (("body", "feed"),))], fragments)
+
+    def test_population_firewall_rejects_non_dse_namespaces(self) -> None:
+        for page_key in ("other~Page", "PageWithoutPrefix"):
+            with self.subTest(page_key=page_key), self.assertRaises(DenominatorFirewallError):
+                fragments = {"body": Fragment("body", page_key, "body_span", b"claim")}
+                validate_population([Proposition("P", True, (("body",),))], fragments)
+
+    def test_population_firewall_rejects_feed_only_core(self) -> None:
+        fragments = {"feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete")}
+        with self.assertRaises(DenominatorFirewallError):
+            validate_population([Proposition("P", True, (("feed",),))], fragments)
+
+    def test_population_firewall_rejects_population_if_one_alternative_is_feed_only(self) -> None:
+        fragments = {
+            "body": Fragment("body", "dse~Page", "body_span", b"claim"),
+            "feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete"),
+        }
+        with self.assertRaises(DenominatorFirewallError):
+            validate_population([Proposition("P", True, (("body",), ("feed",)))], fragments)
+
     def test_delay_retained_unretained_and_na_are_distinct_statuses(self) -> None:
         snapshot = RetainedSnapshot(
             checkpoint=M(10),
-            bodies=(RetainedBodyRecord("dse~E", M(6), b"the retained claim", "h5"),),
+            bodies=(retained("dse~E", M(6), b"the retained claim"),),
             feed_context=(),
         )
         fragments = {"f1": Fragment("f1", "dse~E", "body_span", required_substring=b"retained claim")}
