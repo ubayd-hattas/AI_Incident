@@ -40,11 +40,22 @@ for ev in evidence:
         continue
     rev = revs[rev_id]
     body = rev["body"]
-    enc = rev.get("body_encoding", "ascii")
-    body_bytes = body.encode("latin-1") if enc == "latin-1" else body.encode("utf-8")
+    # docs/E05_TYPED_LOADER.md: the raw JSON `body` string is ALWAYS a Latin-1
+    # byte projection of the true source bytes, regardless of the declared
+    # body_encoding classification -- branching on body_encoding here (as this
+    # code previously did) reproduces a real bug: it silently mis-derives the
+    # source hash for any revision whose declared encoding isn't literally
+    # "latin-1" but whose true bytes are non-ASCII (found independently:
+    # PROP-20260617-17/-18 and 80 occurrence rows on the same page).
+    body_bytes = body.encode("latin-1")
     b_hash = hashlib.sha256(body_bytes).hexdigest()
     hash_match = (b_hash == ev["source_body_hash"])
-    
+    if not hash_match:
+        # Previously this branch didn't exist at all: a hash mismatch never
+        # set all_pass=False, only span mismatches did (a real fail-open gap).
+        print(f"HASH MISMATCH in {eid}: recorded {ev['source_body_hash'][:12]}... recomputed {b_hash[:12]}...")
+        all_pass = False
+
     spans_ok = True
     for s in ev["source_spans"]:
         start, end = s["start"], s["end"]
@@ -72,23 +83,36 @@ for occ in occurrences:
         continue
     r = revs[rid]
     body = r["body"]
+    # This check was previously entirely absent: occurrence body_sha256 was
+    # never independently recomputed against the actual revision body here at
+    # all -- only the char_span text was checked.
+    occ_hash = hashlib.sha256(body.encode("latin-1")).hexdigest()
+    if occ_hash != occ.get("body_sha256"):
+        print(f"OCC HASH MISMATCH: {occ['occurrence_id']} recorded {occ.get('body_sha256', '')[:12]}... recomputed {occ_hash[:12]}...")
+        all_pass = False
     start, end = occ["char_span"]
     parent_ev = next((e for e in evidence if e["evidence_id"] == occ["evidence_id"]), None)
-    if parent_ev:
-        # `quotation` is the full multi-span text (spans joined with an
-        # ellipsis when there is more than one source_span). It only equals a
-        # single occurrence's own char_span slice for single-span
-        # propositions. For multi-span propositions, an occurrence's slice
-        # must match ONE of the parent's individual source_spans instead.
-        if len(parent_ev["source_spans"]) == 1:
-            expected = {parent_ev["quotation"]}
-        else:
-            expected = {span["quote"] for span in parent_ev["source_spans"]}
-        actual = body[start:end]
-        if actual not in expected:
-            print(f"OCC MISMATCH: {occ['occurrence_id']}")
-            all_pass = False
-            continue
+    if parent_ev is None:
+        # Previously fell through to occ_pass_count += 1 with no rejection at
+        # all -- an occurrence with no resolvable evidence parent must fail,
+        # not silently pass.
+        print(f"ORPHAN OCCURRENCE (no matching evidence_id): {occ['occurrence_id']}")
+        all_pass = False
+        continue
+    # `quotation` is the full multi-span text (spans joined with an
+    # ellipsis when there is more than one source_span). It only equals a
+    # single occurrence's own char_span slice for single-span
+    # propositions. For multi-span propositions, an occurrence's slice
+    # must match ONE of the parent's individual source_spans instead.
+    if len(parent_ev["source_spans"]) == 1:
+        expected = {parent_ev["quotation"]}
+    else:
+        expected = {span["quote"] for span in parent_ev["source_spans"]}
+    actual = body[start:end]
+    if actual not in expected:
+        print(f"OCC MISMATCH: {occ['occurrence_id']}")
+        all_pass = False
+        continue
     occ_pass_count += 1
 
 print(f"Occurrences census verified: {occ_pass_count}/{len(occurrences)} PASS")

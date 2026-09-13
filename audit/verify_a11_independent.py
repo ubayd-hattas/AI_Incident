@@ -70,8 +70,14 @@ for ev in evidence:
         print(f"  FAIL {ev['evidence_id']}: rev_id {ev['rev_id']!r} not found in raw export")
         continue
     body = rev["body"]
-    encoding = rev.get("body_encoding", "ascii")
-    body_bytes = body.encode("latin-1") if encoding == "latin-1" else body.encode("utf-8")
+    # docs/E05_TYPED_LOADER.md: the raw `body` string is ALWAYS a Latin-1 byte
+    # projection of the true source bytes regardless of declared body_encoding.
+    # This branch previously compared against the literal "latin-1" (with a
+    # hyphen), which never matches the real field values ("ascii"/"utf8"/
+    # "latin1" without one) -- so it always silently took the wrong UTF-8
+    # path. Confirmed real: 2 evidence + 80 occurrence hash mismatches found
+    # independently against the true (always-latin-1) source bytes.
+    body_bytes = body.encode("latin-1")
     real_hash = hashlib.sha256(body_bytes).hexdigest()
     if real_hash != ev["source_body_hash"]:
         ev_hash_fail += 1
@@ -109,8 +115,7 @@ for occ in occurrences:
         occ_orphan += 1
         continue
     body = rev["body"]
-    encoding = rev.get("body_encoding", "ascii")
-    body_bytes = body.encode("latin-1") if encoding == "latin-1" else body.encode("utf-8")
+    body_bytes = body.encode("latin-1")  # see the same fix/note above
     real_hash = hashlib.sha256(body_bytes).hexdigest()
     if real_hash != occ["body_sha256"]:
         occ_hash_fail += 1
@@ -201,9 +206,17 @@ for eid, original_phrase in (
         continue
     text = " ".join([row.get("critical_reason", ""), row.get("notes", "")])
     found = original_phrase.lower() in text.lower()
-    print(f"  {'STILL PRESENT' if found else 'RESOLVED'}: {eid} {'still uses' if found else 'no longer uses'} the exact originally-flagged phrasing ({original_phrase!r})")
+    # Previously this only printed STILL PRESENT/RESOLVED and never affected
+    # the run's pass/fail outcome -- a prose regression could recur silently.
+    check(f"{eid} no longer uses the exact originally-flagged phrasing ({original_phrase!r})", not found)
 
 print("\n" + "=" * 60)
 print(f"A11 INDEPENDENT VERIFICATION FAILURES: {len(FAILURES)}")
 for f in FAILURES:
     print("  -", f)
+
+if FAILURES:
+    # Previously this script accumulated FAILURES but never exited nonzero --
+    # a real fail-open gap in CI/automation use.
+    import sys as _sys
+    _sys.exit(1)
