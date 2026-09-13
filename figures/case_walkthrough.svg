@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="720" viewBox="0 0 1060 720">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text { font-family: Arial, Helvetica, sans-serif; }</style>
+<text x="70" y="76" font-size="25" font-weight="700" fill="#172554">Construction / ZZZ: source-grounded history panel</text>
+<text x="70" y="101" font-size="14" fill="#475569">Development case GRP-01-CONSTRUCT — mechanism sketch, not a scored collector result</text>
+<line x1="100" y1="180" x2="960" y2="180" stroke="#94a3b8" stroke-width="4"/>
+<circle cx="150" cy="180" r="12" fill="#b45309" stroke="#ffffff" stroke-width="3"/>
+<text x="150" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">14:05:02 UTC</text>
+<rect x="50" y="205" width="200" height="96" rx="8" fill="#f8fafc" stroke="#b45309"/>
+<text x="150" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">Warning published (PROP-20260619-04)</text>
+<text x="150" y="253" text-anchor="middle" font-size="11" fill="#475569">Warning names the ZZZ</text>
+<text x="150" y="268" text-anchor="middle" font-size="11" fill="#475569">fallback.</text>
+<circle cx="390" cy="180" r="12" fill="#2563eb" stroke="#ffffff" stroke-width="3"/>
+<text x="390" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">14:06:38 UTC</text>
+<rect x="290" y="205" width="200" height="96" rx="8" fill="#f8fafc" stroke="#2563eb"/>
+<text x="390" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">ZZZ body published (PROP-20260619-05)</text>
+<text x="390" y="253" text-anchor="middle" font-size="11" fill="#475569">Backup body names the</text>
+<text x="390" y="268" text-anchor="middle" font-size="11" fill="#475569">original page.</text>
+<circle cx="690" cy="180" r="12" fill="#dc2626" stroke="#ffffff" stroke-width="3"/>
+<text x="690" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">15:46:37 UTC</text>
+<rect x="590" y="205" width="200" height="96" rx="8" fill="#f8fafc" stroke="#dc2626"/>
+<text x="690" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">Original title deleted</text>
+<text x="690" y="253" text-anchor="middle" font-size="11" fill="#475569">Successful deletion event</text>
+<text x="690" y="268" text-anchor="middle" font-size="11" fill="#475569">recorded.</text>
+<circle cx="900" cy="180" r="12" fill="#991b1b" stroke="#ffffff" stroke-width="3"/>
+<text x="900" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">15:46:49 UTC</text>
+<rect x="800" y="205" width="200" height="96" rx="8" fill="#f8fafc" stroke="#991b1b"/>
+<text x="900" y="230" text-anchor="middle" font-size="12" font-weight="700" fill="#1e293b">ZZZ title deleted</text>
+<text x="900" y="253" text-anchor="middle" font-size="11" fill="#475569">Recorded 12 seconds after</text>
+<text x="900" y="268" text-anchor="middle" font-size="11" fill="#475569">original.</text>
+<rect x="70" y="340" width="920" height="38" rx="6" fill="#e0f2fe"/>
+<text x="90" y="365" font-size="14" font-weight="700" fill="#0c4a6e">What the collection mechanisms imply — not measured outcomes</text>
+<rect x="70" y="400" width="290" height="142" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<rect x="70" y="400" width="290" height="31" rx="8" fill="#1e3a8a"/>
+<text x="84" y="421" font-size="13" font-weight="700" fill="#ffffff">P15: Fixed periodic sweep</text>
+<text x="84" y="462" font-size="12" fill="#334155">Whether it sees the ZZZ body</text>
+<text x="84" y="479" font-size="12" fill="#334155">depends on phase and discovery</text>
+<text x="84" y="496" font-size="12" fill="#334155">timing.</text>
+<rect x="380" y="400" width="290" height="142" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<rect x="380" y="400" width="290" height="31" rx="8" fill="#1e3a8a"/>
+<text x="394" y="421" font-size="13" font-weight="700" fill="#ffffff">PCD15: Feed can name a title</text>
+<text x="394" y="462" font-size="12" fill="#334155">The GET schedule still follows</text>
+<text x="394" y="479" font-size="12" fill="#334155">its periodic sweep.</text>
+<rect x="690" y="400" width="290" height="142" rx="8" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+<rect x="690" y="400" width="290" height="31" rx="8" fill="#1e3a8a"/>
+<text x="704" y="421" font-size="13" font-weight="700" fill="#ffffff">E30: Event can schedule a GET</text>
+<text x="704" y="462" font-size="12" fill="#334155">Admission, completion, and FIFO</text>
+<text x="704" y="479" font-size="12" fill="#334155">retention still determine</text>
+<text x="704" y="496" font-size="12" fill="#334155">availability.</text>
+<rect x="70" y="576" width="920" height="67" rx="8" fill="#fffbeb" stroke="#d97706"/>
+<text x="90" y="603" font-size="13" font-weight="700" fill="#78350f">Interpretive limit</text>
+<text x="90" y="625" font-size="12" fill="#78350f">The source records a warning and later backup body; it does not establish intent, distinct agents, permanent erasure, or a measured policy advantage.</text>
+<rect x="0" y="0" width="1060" height="42" fill="#7f1d1d"/>
+<text x="530.0" y="28" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">SYNTHETIC — pending X13 execution</text>
+<text x="530.0" y="360.0" text-anchor="middle" font-size="34" font-weight="700" fill="#991b1b" opacity="0.24" transform="rotate(-24 530.0 360.0)">SYNTHETIC — pending X13 execution</text>
+<text x="530.0" y="704" text-anchor="middle" font-size="14" font-weight="700" fill="#991b1b">SYNTHETIC — pending X13 execution</text>
+</svg>
