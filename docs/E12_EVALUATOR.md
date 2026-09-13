@@ -14,6 +14,8 @@ The loader freezes each proposition's evidence ID, annotation-provided `critical
 
 Synthetic poison tests confirm that bodies visible in diagnostic results but rejected or absent from the final capped store cannot satisfy evidence.
 
+Before any coverage or delay path scores a snapshot, it recomputes SHA-256 over every retained canonical body and compares it with the supplied `body_sha256`. Any mismatch raises `SnapshotIntegrityError`; the evaluator never repairs the hash or drops only the corrupt record. It also rejects any retained body with `capture_time > checkpoint`. A capture exactly at the checkpoint is permitted. These checks cover the complete snapshot, including records unrelated to the fragment currently being tested, so one corrupt record invalidates the whole evaluation.
+
 ## Proposition and support semantics
 
 One proposition is one denominator unit. Occurrence rows are a provenance/support census and never create additional evidence units.
@@ -27,6 +29,10 @@ No fuzzy, normalized, near-copy, or new paraphrase matching is performed.
 ## A05 denominator firewall
 
 Loading fails closed on duplicate IDs, missing eligibility dispositions, missing split assignments, proposition/group split disagreement, cross-split page/group leakage, malformed or orphan occurrence references, unresolved revision/body references, body-hash/span mismatch, support outside the frozen source spans, dangling fragments, and eligible critical propositions without complete core support. Errors are exposed as structured `ValidationIssue` records in `ValidationReport`; normal loading raises on any issue rather than dropping rows.
+
+The population firewall additionally rejects every fragment outside the frozen opaque-key namespace (`page_key.startswith("dse~")`). For every eligible proposition, each core alternative must resolve completely and contain at least one `body_span` fragment; a feed-only core alternative invalidates the population even if another alternative is body-grounded. Context alternatives retain their existing semantics.
+
+Raw revision JSON bodies are decoded according to E05 custody in two stages: the JSON string is always reversed with `.encode("latin-1")` to reconstruct source bytes, then the declared `body_encoding` is used only to derive the observer's canonical UTF-8 bytes. The corrected source-hash check currently exposes frozen annotation defects in exactly 2 evidence rows and 80 occurrence rows. The loader therefore fails closed on the current artifacts pending annotation-team correction; those hashes were not silently rewritten by E12.
 
 ## Split, eligibility, and critical filtering
 
