@@ -100,7 +100,7 @@ held_rows = [e for e in evidence if e["evidence_id"] in held_ids_early]
 print(f"  INFO per-split (recomputed): dev={len(dev_rows)} evidence / {sum(1 for r in dev_rows if r['critical'])} critical -- held={len(held_rows)} evidence / {sum(1 for r in held_rows if r['critical'])} critical")
 
 print("\n=== 2. occurrences.jsonl: independently recomputed hash + span integrity (all occurrences) ===")
-check(f"occurrences.jsonl has {len(occurrences)} rows (claimed 1,361)", len(occurrences) == 1361, str(len(occurrences)))
+check(f"occurrences.jsonl has {len(occurrences)} rows (claimed 1,421 after the 2026-09-13 exact-match completeness fix)", len(occurrences) == 1421, str(len(occurrences)))
 occ_hash_fail = occ_span_fail = occ_orphan = occ_evhash_mismatch = 0
 for occ in occurrences:
     rev = revs.get(occ["rev_id"])
@@ -118,11 +118,24 @@ for occ in occurrences:
         # only meaningful to compare directly when it's literally the same revision as the parent's anchor
         pass
     start, end = occ["char_span"]
-    if body[start:end] != parent["quotation"]:
+    occ_text = body[start:end]
+    # A proposition's `quotation` field is the FULL multi-span text (spans
+    # joined with an ellipsis for multi-span propositions), which only equals
+    # a single occurrence's own char_span slice when the proposition has
+    # exactly one source_span. For multi-span propositions (currently just
+    # PROP-20260619-01), each occurrence's slice must instead match ONE of
+    # the parent's individual source_spans' quote text -- comparing against
+    # the combined `quotation` would spuriously fail every correctly-recorded
+    # multi-span occurrence.
+    if len(parent["source_spans"]) == 1:
+        expected_texts = {parent["quotation"]}
+    else:
+        expected_texts = {span["quote"] for span in parent["source_spans"]}
+    if occ_text not in expected_texts:
         occ_span_fail += 1
 check("no occurrence references a missing rev_id or evidence_id", occ_orphan == 0, f"{occ_orphan} orphaned")
 check("every occurrence's own body_sha256 independently reproduces from its own rev_id's body", occ_hash_fail == 0, f"{occ_hash_fail} mismatches")
-check("every occurrence's char_span independently reproduces its parent proposition's exact quotation text", occ_span_fail == 0, f"{occ_span_fail} mismatches")
+check("every occurrence's char_span independently reproduces one of its parent proposition's exact source_span quotes", occ_span_fail == 0, f"{occ_span_fail} mismatches")
 
 print("\n=== 3. Cross-file hash chain: does splits.json actually pin the files on disk? ===")
 # Normalize CRLF->LF before hashing. A raw read_bytes() hash depends on the local

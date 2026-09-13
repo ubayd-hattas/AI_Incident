@@ -75,9 +75,17 @@ for occ in occurrences:
     start, end = occ["char_span"]
     parent_ev = next((e for e in evidence if e["evidence_id"] == occ["evidence_id"]), None)
     if parent_ev:
-        quote = parent_ev["quotation"]
+        # `quotation` is the full multi-span text (spans joined with an
+        # ellipsis when there is more than one source_span). It only equals a
+        # single occurrence's own char_span slice for single-span
+        # propositions. For multi-span propositions, an occurrence's slice
+        # must match ONE of the parent's individual source_spans instead.
+        if len(parent_ev["source_spans"]) == 1:
+            expected = {parent_ev["quotation"]}
+        else:
+            expected = {span["quote"] for span in parent_ev["source_spans"]}
         actual = body[start:end]
-        if actual != quote:
+        if actual not in expected:
             print(f"OCC MISMATCH: {occ['occurrence_id']}")
             all_pass = False
             continue

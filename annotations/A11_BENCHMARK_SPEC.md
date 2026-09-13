@@ -30,7 +30,7 @@ This document formally registers and cryptographically freezes the benchmark eva
 - **Target Episodes**: **71 validated page episodes** (37 Development / 34 Held-Out), greatly exceeding the $\ge 40$ episodes target.
 - **Title/Copy Groups**: **25 distinct groups** spanning 50 individual pages (revised 2026-09-12 to include 7 previously-uncataloged cross-title mirror pages, see correction note above), exceeding the $\ge 20$ groups target.
 - **Atomic Evidence Propositions**: **65 distinct propositions** (**57 critical, 8 non-critical** — corrected 2026-09-13, Sam: the "49/16" figure previously here did not match `evidence.jsonl`'s own `critical` field or `splits.json`'s `summary` block, which have always said 57/8; this was stale prose, not a data or judgment change), comfortably within the contractual 60–120 proposition range.
-- **Occurrence Census**: **1,361 verified occurrence records** identified across the entire 13,403-revision DSE corpus, mapping primary introductions, cumulative carryforwards, and cross-title backup mirrors.
+- **Occurrence Census**: **1,421 verified occurrence records** (revised 2026-09-13: +60 for `PROP-20260619-01`, found by an exhaustive whole-DSE exact-match search after the acceptance matrix flagged it as having zero occurrence rows despite two valid anchor spans — see `audit/occurrence_census_search.py`) identified across the entire 13,403-revision DSE corpus, mapping primary introductions, cumulative carryforwards, and cross-title backup mirrors. This closes the *exact-match* completeness gap only (item D); normalized/near-copy candidate search still requires human review and is not claimed here.
 - **Data Leakage Isolation**: **Zero overlap** ($0$ shared titles/copy groups) between `dev` and `held_out` splits. All episodes, subsequent edits, and cross-page mirrors of a title group are strictly clustered in the same split.
 - **Second-Review & Adjudication**: 100% of propositions independently second-reviewed by Aaron and adjudicated/approved by Jaswin (`annotations/adjudication.csv`).
 
@@ -43,7 +43,7 @@ The evaluation benchmark is sealed under the following SHA-256 checksums:
 | Artifact | Path | SHA-256 Checksum |
 |---|---|---|
 | Evidence Units | `annotations/evidence.jsonl` | `a1d201a437adffad3b7571ffdd3e21eea2b03f34d054f71ba71634afb32945f3` |
-| Occurrence Census | `annotations/occurrences.jsonl` | `980c12aa885a7fcc9851a4eba4c249b44a67c0fae53a9bf238a1754266ea88f0` |
+| Occurrence Census | `annotations/occurrences.jsonl` | `95e028eb6318678f7049ca002c605bacc7af2719cc565805c0ca49ea6bef66f2` (updated 2026-09-13 for the +60-row exact-match completeness fix above) |
 | Split Allocation | `annotations/splits.json` | see `annotations/splits.json`'s own `checksums` block is self-referential and therefore not meaningful; pinned externally in `docs/PROJECT_STATUS.md`'s A11 changelog entry instead |
 | Adjudication Table | `annotations/adjudication.csv` | `b2686e4c7ddbd3bee32ca688076db36beb5f804c231df04be913785d9938c00c` (unchanged content; not previously pinned at all) |
 
@@ -112,7 +112,7 @@ To prevent data leakage during collector evaluation:
 | **Evidence Propositions** | 34 propositions | 31 propositions | **65 propositions** |
 | **Critical Propositions** | 30 propositions | 27 propositions | **57 propositions** |
 | **Non-Critical Controls** | 4 propositions | 4 propositions | **8 propositions** |
-| **Occurrence Records** | 717 occurrences | 644 occurrences | **1,361 occurrences** |
+| **Occurrence Records** | 777 occurrences | 644 occurrences | **1,421 occurrences** |
 
 **Correction (2026-09-13, Sam):** every number in this table except the totals column has been independently
 recomputed directly from `evidence.jsonl`/`occurrences.jsonl`/`splits.json` (not copied from an earlier draft). The

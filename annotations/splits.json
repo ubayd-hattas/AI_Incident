@@ -4,8 +4,9 @@
   "frozen_utc": "2026-09-12T20:55:00Z",
   "checksums": {
     "evidence_jsonl_sha256": "a1d201a437adffad3b7571ffdd3e21eea2b03f34d054f71ba71634afb32945f3",
-    "occurrences_jsonl_sha256": "980c12aa885a7fcc9851a4eba4c249b44a67c0fae53a9bf238a1754266ea88f0",
-    "_checksum_domain_note": "Corrected 2026-09-13 (Sam): both hashes are now the canonical SHA-256 of the actual committed git blob (`git show HEAD:<path> | sha256sum`), not a local working-tree read. On a Windows checkout with core.autocrlf=true, `sha256sum`/`open(path,'rb')` silently hash CRLF-converted bytes that differ from what git actually stores (LF) and what anyone else's clone produces -- this affected BOTH fields here (occurrences_jsonl_sha256 was never edited in content but was pinned from a CRLF read the whole time) and, separately, all 11 R04 accounting fixture hashes (see audit/R04_ACCOUNTING_VERIFICATION.md's own correction note). A root .gitattributes (`* text=auto eol=lf`) now makes normalization explicit. No file content changed as a result of this correction -- only which byte representation was hashed.",
+    "occurrences_jsonl_sha256": "95e028eb6318678f7049ca002c605bacc7af2719cc565805c0ca49ea6bef66f2",
+    "_checksum_domain_note": "Hashes are the canonical SHA-256 of the actual committed git blob (LF-normalized), not a local working-tree read -- see audit/R04_ACCOUNTING_VERIFICATION.md's correction note for why that distinction matters (Windows core.autocrlf=true silently converts LF to CRLF on checkout). A root .gitattributes (`* text=auto eol=lf`) makes normalization explicit.",
+    "_occurrences_jsonl_content_note": "occurrences_jsonl_sha256 updated 2026-09-13 (Sam, audit/occurrence_census_search.py) after adding 60 occurrence rows for PROP-20260619-01: 2 for its own anchor revision (source_spans Alex already recorded but that were never transcribed into occurrences.jsonl) plus 58 exact-match cumulative_carryforward occurrences found by an exhaustive whole-DSE search (a fixed page header persisting unchanged across dse~DataUSAConstructionWageSep18Live@2 through @30). All added rows are byte-exact substring matches of the proposition's own already-recorded source_spans quotes -- no new semantic judgment, no near-copy/paraphrase equivalence calls. Re-running the search after this fix finds 0 remaining exact-match gaps across all 65 propositions. Prior hash: 7edb1331c44ecbfd9efa2eed9fe8ef82f082dab20c161a53c5f7706d1005875c (this was itself already a CRLF-vs-canonical artifact, not a content hash of the pre-fix content -- see R04_ACCOUNTING_VERIFICATION.md's note).",
     "_evidence_jsonl_content_note": "evidence.jsonl's actual CONTENT changed 2026-09-12 (Sam, audit/A11_INDEPENDENT_VERIFICATION.md): PROP-20260619-03/PROP-20260620-09's critical_reason/notes were revised to remove epistemic-leakage prose flagged by docs/PRE_RESULTS_AUDIT.md (treating an agent self-report as externally 'confirming' fact). No spans, hashes, quotations, claim_status, or critical flags changed -- only the two rationale/notes fields. (This note is about the content change; see _checksum_domain_note above for the separate hash-representation correction.)"
   },
   "summary": {
@@ -18,7 +19,7 @@
     "total_groups": 25,
     "dev_groups": 13,
     "held_out_groups": 12,
-    "total_occurrences": 1361
+    "total_occurrences": 1421
   },
   "groups": {
     "GRP-01-CONSTRUCT": {
