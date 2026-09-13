@@ -4,6 +4,18 @@
 > `src/ebe/collectors.py`, with full re-verification against the existing test suite and every audit script in this
 > directory. See `audit/X01_X02_A04_FIXES.md` for exactly what changed and why. The findings below describe the
 > bugs as originally confirmed; they are not stale, just superseded by that follow-up.
+>
+> **Retraction (2026-09-13, Sam): the "Correction: A02" section below was wrong. Jaswin's pre-results audit was
+> right and I was wrong.** I computed all 11 "current" hashes using `sha256sum`/`open(path,'rb')` against my local
+> Windows working-tree files. This machine has `core.autocrlf=true`, which silently converts every checked-out
+> text file's LF line endings to CRLF — bytes that differ from what git actually stores (LF) and from what any
+> other clone produces. I re-verified: `git show HEAD:<path> | sha256sum` (the canonical, checkout-independent
+> content) for all 11 files reproduces **exactly** the hashes `docs/PRE_RESULTS_AUDIT.md`'s own appendix reported —
+> the ones I dismissed as unreproducible. The file *contents* were never wrong or tampered with; only my hashing
+> method was. Corrected in `audit/R04_ACCOUNTING_VERIFICATION.md`, `annotations/splits.json`,
+> `annotations/A11_BENCHMARK_SPEC.md` (which had the same bug, independently discovered while investigating this),
+> and a new root `.gitattributes` (`* text=auto eol=lf`) so it can't recur silently. This is exactly the kind of
+> error this whole validation exercise exists to catch — including in myself.
 
 Role: independent validation (Sam). This document independently re-checks the pre-results audit's concrete,
 falsifiable claims rather than taking them on trust or defending prior work reflexively — the same discipline
@@ -78,40 +90,39 @@ from scoring evidence coverage against `body_results`/`capture_attempts` instead
 snapshot, which would silently defeat the whole point of the capacity cap. **Confirmed real gap**, correctly
 classified as a pre-E12 blocker (A04), not a storage bug.
 
-## Correction: A02 — the accounting-hash mismatch does not reproduce
+## Retracted and fixed: A02 — the accounting-hash mismatch was real, and has now been repinned correctly
 
-The pre-results audit states "Checked all 11 SHA-256 entries in accounting acceptance against local bytes: none
-match" and lists A02 as a **BLOCKER BEFORE E12**. Independently recomputing SHA-256 over every one of the same 11
-files, right now, against a clean working tree (`git status` clean, `HEAD` = current `main`):
+**This section originally claimed A02 didn't reproduce. That claim was wrong; see the retraction note at the top
+of this document.** The pre-results audit stated "Checked all 11 SHA-256 entries in accounting acceptance against
+local bytes: none match." That was correct. My original rebuttal computed all 11 "current" hashes via
+`sha256sum path` / `open(path, "rb")` on my local Windows checkout, which has `core.autocrlf=true` — git's clean/
+smudge filter converts the repository's LF-stored content to CRLF on checkout, silently. Every one of those 11
+"current" hashes was therefore the hash of CRLF bytes that exist only on my machine's working tree, not the LF
+bytes actually stored in the git blob (what a fresh clone, CI, or any teammate without that exact local setting
+would get).
 
-| File | Current SHA-256 | Matches `R04_ACCOUNTING_VERIFICATION.md`'s pinned hash? |
-|---|---|---|
-| `docs/R04_ACCOUNTING_AMENDMENT.md` | `4370744a1da7e5586912762e60b5ce8e4d5560ce63e7c572c6330d7eefde4abb` | **Yes** |
-| `tests/fixtures/accounting/README.md` | `ae60dd12b22bcc9257219dbdb4475e73ff0587b3442fb767c0cc1b917309df43` | **Yes** |
-| `tests/fixtures/accounting/A_feed.json` | `5412bbe2cb0e3e658f49280a4ceeb96720b2b16dfdc154fb9ab40533d31ce0ce` | **Yes** |
-| `tests/fixtures/accounting/B_unique.json` | `3c69ed5db8efb91b348b522c87069aaf1b95b5f8ceb2a6b9f5cedffb0b632a9f` | **Yes** |
-| `tests/fixtures/accounting/C_duplicate.json` | `a797a7a53d0d100d970dee2b1c5c3005e59963f2ee0230b9bb5affaa08901525` | **Yes** |
-| `tests/fixtures/accounting/D_nondedup.json` | `5682dd2ee68d2e7cc7385fc390fdaba0258514348b12d372957b528419fde01e` | **Yes** |
-| `tests/fixtures/accounting/E_fifo.json` | `2f0fa686f886a6f5d0a90f87df8e72d539872aea3a658ab6e5c10fdf13a696ea` | **Yes** |
-| `tests/fixtures/accounting/F_oversize.json` | `ce1e5afd11fdaac47865791430b7fb8243c4d0bb71ef8fbbd971de6d19caf999` | **Yes** |
-| `tests/fixtures/accounting/G_shared_fifo.json` | `e07f39048fa95e63bbc402adecdab870767ff3325004612cc1f7e7e3f74f0a7e` | **Yes** |
-| `tests/fixtures/accounting/H_protocol.json` | `da9c3da6018a9b35b5c6034a398960c183c1658d69e427b45210fb4c93750d14` | **Yes** |
-| `tests/fixtures/accounting/I_encoding.json` | `e61761488cd5a2d3a5ec5858866132175c6f456dbb17a7816de86c8d8f4dce50` | **Yes** |
+Re-verified properly, using the canonical committed content (`git show HEAD:<path> | sha256sum`) instead of a raw
+working-tree read:
 
-**All 11 match exactly**, byte for byte. Further, `git log --oneline --follow -- docs/R04_ACCOUNTING_AMENDMENT.md`
-(and the same for each fixture file) shows exactly **one** commit ever touched these files —
-`aaf0028 docs: freeze R04 accounting and block E08 pending review`, the original freeze — with no subsequent edits.
-The working tree is clean, so current bytes are exactly the bytes committed at `aaf0028`, which are exactly the
-bytes `R04_ACCOUNTING_VERIFICATION.md` pinned at acceptance time. There is no custody gap to trace: the files never
-changed.
+| File | Canonical (git-blob) SHA-256 | Matches `PRE_RESULTS_AUDIT.md`'s appendix? | Matches original `R04_ACCOUNTING_VERIFICATION.md` pin (CRLF)? |
+|---|---|---|---|
+| `docs/R04_ACCOUNTING_AMENDMENT.md` | `3ccd0a5566cb31546455bc1a98b56bcc4369ea1d4e78f3f9f95f8e1adf573fbb` | **Yes** | No |
+| `tests/fixtures/accounting/README.md` | `3f604a6beb31a5ce0962a7041d37f5b72540ccf804469450328ab1918a78f586` | **Yes** | No |
+| `tests/fixtures/accounting/A_feed.json` | `f16c9066c5f30cc48e4c226510da24368cb4079012fee67ea76a54945b6a80bb` | **Yes** | No |
+| `tests/fixtures/accounting/B_unique.json` | `926df392e3a1c2682cae612aa51ef17a2f7857d163b4020ff130d95d0efe8320` | **Yes** | No |
+| `tests/fixtures/accounting/C_duplicate.json` | `5427dc744ff5fcf1c2219799b6840bfb0e15c95d47b547c6a4fddb627268e26b` | **Yes** | No |
+| `tests/fixtures/accounting/D_nondedup.json` | `101dcf53e881af1641173670abc0ceb3fd0bccd17eba3c590d7eaa4f67666ea8` | **Yes** | No |
+| `tests/fixtures/accounting/E_fifo.json` | `6d99644641b028bda6f33d4238562249c3bfe9839d5bb81e5e0f7aaed4c2e107` | **Yes** | No |
+| `tests/fixtures/accounting/F_oversize.json` | `8e5e289e5721b9ab1e2addf002cf34a5eb731a45aef3c8a60fed54cdacb3409c` | **Yes** | No |
+| `tests/fixtures/accounting/G_shared_fifo.json` | `6704dbf87693cfa67e01912c22bcc6c2a79dbaa69022d587d5cc46e8013cf89d` | **Yes** | No |
+| `tests/fixtures/accounting/H_protocol.json` | `178ae931e9469c360517ee0edfb6131e21b5da920f4ed2d6724168020f4290da` | **Yes** | No |
+| `tests/fixtures/accounting/I_encoding.json` | `f2013997173c8ca01b236052222fe1127c687d1608de1d8eef457375bf12e3a4` | **Yes** | No |
 
-I am not asserting the pre-results audit fabricated this — the more likely explanation is a hashing-methodology
-difference in that pass (e.g. a different checkout state, an encoding/line-ending handling difference in whatever
-computed the "current" column of its own appendix table, which itself lists a *different* amendment hash,
-`3ccd0a55...`, than what any live copy of this repository has ever contained). Whatever the cause on that end, **as
-independently checked right now, A02 does not reproduce and should not block E12.** `docs/PROJECT_STATUS.md`'s
-current text (§1, §3 R04 row, §7 changelog) asserting "all 11 hashes... disagree" is being corrected alongside
-this document.
+**All 11 canonical hashes exactly match `PRE_RESULTS_AUDIT.md`'s own appendix table.** `git log --oneline --follow`
+still confirms exactly one commit (`aaf0028`) ever touched these files — the content genuinely never changed, only
+the byte representation used to hash it did. `audit/R04_ACCOUNTING_VERIFICATION.md`'s pinned hashes have been
+corrected to these canonical values. A02 is real, was real, and is now fixed by re-pinning correctly rather than by
+declaring it a non-issue. `docs/PROJECT_STATUS.md` is corrected alongside this document.
 
 ## Accepted and closed: D04 — my own E08 audit overstated A/H/I's chronology
 
@@ -138,8 +149,10 @@ concrete claim in A/H/I through the actual `Observer`/`accounting`/`storage` cod
 
 ## What this changes
 
-- **A02 is not a blocker as stated.** The accounting acceptance's custody is intact; no reacceptance of *content*
-  is needed (though nothing here waives Aaron's still-open optional second confirmation).
+- **A02 was real and is now fixed.** All 11 accounting-fixture hashes are re-pinned to their canonical (git-blob)
+  values, matching `PRE_RESULTS_AUDIT.md`'s own appendix exactly. No fixture *content* changed or needs
+  re-acceptance — only the hash-computation method was wrong (nothing here waives Aaron's still-open optional
+  second confirmation).
 - **X01, X02, A04 are real and now independently confirmed**, not just asserted by one audit pass — and, given the
   deadline, have since been fixed directly in `src/ebe/observer.py`/`src/ebe/collectors.py` (see
   `audit/X01_X02_A04_FIXES.md`) rather than left as a handoff, with full test-suite and audit-script re-verification.
@@ -147,7 +160,8 @@ concrete claim in A/H/I through the actual `Observer`/`accounting`/`storage` cod
 - Nothing else in the pre-results audit's findings was re-litigated here; its sensor-access matrix, PCD-strength
   analysis, and statistical-plan sections were not independently re-derived in this pass and stand as delivered.
 
-No source, collector, annotation, frozen contract, or prior acceptance record's *findings* were altered — only
-`audit/E08_NEUTRALITY_AUDIT.md`'s item 8 text (a correction to what it claims to have covered) and
-`docs/PROJECT_STATUS.md` (reflecting the A02 correction and this closure) were touched, alongside the two new files
-this document names.
+No fixture, evidence, or occurrence *content* was altered by the A02 retraction — only the hash values pinned in
+`audit/R04_ACCOUNTING_VERIFICATION.md`, `annotations/splits.json`, and `annotations/A11_BENCHMARK_SPEC.md` (all of
+which had the same CRLF-vs-canonical hashing bug, independently discovered while investigating this), plus a new
+root `.gitattributes` and `docs/PROJECT_STATUS.md`. `audit/E08_NEUTRALITY_AUDIT.md`'s item 8 text was separately
+corrected for the unrelated D04 finding above.

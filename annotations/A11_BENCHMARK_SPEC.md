@@ -29,7 +29,7 @@ This document formally registers and cryptographically freezes the benchmark eva
 
 - **Target Episodes**: **71 validated page episodes** (37 Development / 34 Held-Out), greatly exceeding the $\ge 40$ episodes target.
 - **Title/Copy Groups**: **25 distinct groups** spanning 50 individual pages (revised 2026-09-12 to include 7 previously-uncataloged cross-title mirror pages, see correction note above), exceeding the $\ge 20$ groups target.
-- **Atomic Evidence Propositions**: **65 distinct propositions** (49 critical, 16 non-critical), comfortably within the contractual 60–120 proposition range.
+- **Atomic Evidence Propositions**: **65 distinct propositions** (**57 critical, 8 non-critical** — corrected 2026-09-13, Sam: the "49/16" figure previously here did not match `evidence.jsonl`'s own `critical` field or `splits.json`'s `summary` block, which have always said 57/8; this was stale prose, not a data or judgment change), comfortably within the contractual 60–120 proposition range.
 - **Occurrence Census**: **1,361 verified occurrence records** identified across the entire 13,403-revision DSE corpus, mapping primary introductions, cumulative carryforwards, and cross-title backup mirrors.
 - **Data Leakage Isolation**: **Zero overlap** ($0$ shared titles/copy groups) between `dev` and `held_out` splits. All episodes, subsequent edits, and cross-page mirrors of a title group are strictly clustered in the same split.
 - **Second-Review & Adjudication**: 100% of propositions independently second-reviewed by Aaron and adjudicated/approved by Jaswin (`annotations/adjudication.csv`).
@@ -42,10 +42,18 @@ The evaluation benchmark is sealed under the following SHA-256 checksums:
 
 | Artifact | Path | SHA-256 Checksum |
 |---|---|---|
-| Evidence Units | `annotations/evidence.jsonl` | `5b89571d3faf4359fd462f69ff9305d04b60d1222d7f8d94386bb0b253c98f6e` (updated 2026-09-12, see correction note above) |
-| Occurrence Census | `annotations/occurrences.jsonl` | `7edb1331c44ecbfd9efa2eed9fe8ef82f082dab20c161a53c5f7706d1005875c` |
-| Split Allocation | `annotations/splits.json` | Recorded in repository |
-| Adjudication Table | `annotations/adjudication.csv` | Recorded in repository |
+| Evidence Units | `annotations/evidence.jsonl` | `a1d201a437adffad3b7571ffdd3e21eea2b03f34d054f71ba71634afb32945f3` |
+| Occurrence Census | `annotations/occurrences.jsonl` | `980c12aa885a7fcc9851a4eba4c249b44a67c0fae53a9bf238a1754266ea88f0` |
+| Split Allocation | `annotations/splits.json` | see `annotations/splits.json`'s own `checksums` block is self-referential and therefore not meaningful; pinned externally in `docs/PROJECT_STATUS.md`'s A11 changelog entry instead |
+| Adjudication Table | `annotations/adjudication.csv` | `b2686e4c7ddbd3bee32ca688076db36beb5f804c231df04be913785d9938c00c` (unchanged content; not previously pinned at all) |
+
+**Correction (2026-09-13, Sam):** all hashes in this table are now the canonical SHA-256 of the actual committed git
+blob (`git show HEAD:<path> | sha256sum`), not a local working-tree read — see `audit/R04_ACCOUNTING_VERIFICATION.md`'s
+correction note for the full root-cause explanation (Windows `core.autocrlf` silently converting LF to CRLF on
+checkout). No file content changed as a result; only which byte representation was hashed. The Split
+Allocation/Adjudication Table rows previously said "Recorded in repository" with no actual hash pinned at all — an
+independently-produced acceptance matrix correctly flagged this as a real custody gap (nothing to verify against).
+Adjudication Table's hash is now pinned; Split Allocation's own file cannot usefully pin its own hash inside itself.
 
 ---
 
@@ -101,10 +109,16 @@ To prevent data leakage during collector evaluation:
 | **Title/Copy Groups** | 13 groups (52.0%) | 12 groups (48.0%) | **25 groups** |
 | **Page Episodes** | 37 episodes (52.1%) | 34 episodes (47.9%) | **71 episodes** |
 | **Individual Pages** | 28 pages | 22 pages | **50 pages** (revised 2026-09-12: 7 cross-title mirror pages, already referenced by occurrences.jsonl, were added to their groups' page catalogs — see correction note above and `audit/A11_INDEPENDENT_VERIFICATION.md`) |
-| **Evidence Propositions** | 35 propositions | 30 propositions | **65 propositions** |
-| **Critical Propositions** | 27 propositions | 22 propositions | **49 propositions** |
-| **Non-Critical Controls** | 8 propositions | 8 propositions | **16 propositions** |
-| **Occurrence Records** | 714 occurrences | 647 occurrences | **1,361 occurrences** |
+| **Evidence Propositions** | 34 propositions | 31 propositions | **65 propositions** |
+| **Critical Propositions** | 30 propositions | 27 propositions | **57 propositions** |
+| **Non-Critical Controls** | 4 propositions | 4 propositions | **8 propositions** |
+| **Occurrence Records** | 717 occurrences | 644 occurrences | **1,361 occurrences** |
+
+**Correction (2026-09-13, Sam):** every number in this table except the totals column has been independently
+recomputed directly from `evidence.jsonl`/`occurrences.jsonl`/`splits.json` (not copied from an earlier draft). The
+previous version of this table (35/30 propositions, 27/22 critical, 8/8 controls, 714/647 occurrences) did not match
+the actual per-split contents. Nothing in `splits.json` was changed to produce this correction — the underlying data
+was already right; only this document's transcription of it was stale.
 
 **Leakage Audit**: `len(dev_pages.intersection(held_pages)) == 0` (Confirmed by `audit/verify_annotations.py`).
 

@@ -3,9 +3,10 @@
   "dataset_name": "Evidence Before Erasure (EBE) Benchmark v0.1",
   "frozen_utc": "2026-09-12T20:55:00Z",
   "checksums": {
-    "evidence_jsonl_sha256": "5b89571d3faf4359fd462f69ff9305d04b60d1222d7f8d94386bb0b253c98f6e",
-    "occurrences_jsonl_sha256": "7edb1331c44ecbfd9efa2eed9fe8ef82f082dab20c161a53c5f7706d1005875c",
-    "_evidence_jsonl_sha256_note": "Updated 2026-09-12 (Sam, audit/A11_INDEPENDENT_VERIFICATION.md) after revising PROP-20260619-03/PROP-20260620-09's critical_reason/notes to remove epistemic-leakage prose flagged by docs/PRE_RESULTS_AUDIT.md (treating an agent self-report as externally 'confirming' fact). Prior hash: ac3d6391784e87e338fc2a14c2289e64b46ecbd50c1ee7759c879ff51d70cdec. No spans, hashes, quotations, claim_status, or critical flags changed -- only the two rationale/notes fields."
+    "evidence_jsonl_sha256": "a1d201a437adffad3b7571ffdd3e21eea2b03f34d054f71ba71634afb32945f3",
+    "occurrences_jsonl_sha256": "980c12aa885a7fcc9851a4eba4c249b44a67c0fae53a9bf238a1754266ea88f0",
+    "_checksum_domain_note": "Corrected 2026-09-13 (Sam): both hashes are now the canonical SHA-256 of the actual committed git blob (`git show HEAD:<path> | sha256sum`), not a local working-tree read. On a Windows checkout with core.autocrlf=true, `sha256sum`/`open(path,'rb')` silently hash CRLF-converted bytes that differ from what git actually stores (LF) and what anyone else's clone produces -- this affected BOTH fields here (occurrences_jsonl_sha256 was never edited in content but was pinned from a CRLF read the whole time) and, separately, all 11 R04 accounting fixture hashes (see audit/R04_ACCOUNTING_VERIFICATION.md's own correction note). A root .gitattributes (`* text=auto eol=lf`) now makes normalization explicit. No file content changed as a result of this correction -- only which byte representation was hashed.",
+    "_evidence_jsonl_content_note": "evidence.jsonl's actual CONTENT changed 2026-09-12 (Sam, audit/A11_INDEPENDENT_VERIFICATION.md): PROP-20260619-03/PROP-20260620-09's critical_reason/notes were revised to remove epistemic-leakage prose flagged by docs/PRE_RESULTS_AUDIT.md (treating an agent self-report as externally 'confirming' fact). No spans, hashes, quotations, claim_status, or critical flags changed -- only the two rationale/notes fields. (This note is about the content change; see _checksum_domain_note above for the separate hash-representation correction.)"
   },
   "summary": {
     "total_propositions": 65,

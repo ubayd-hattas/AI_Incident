@@ -43,19 +43,29 @@ The amendment's own red-team table asserts no policy gets a hidden accounting ad
 
 ## File hashes at time of acceptance
 
-| File | SHA-256 |
+**Corrected 2026-09-13 (Sam):** every hash below was originally computed against this reviewer's local Windows
+working-tree bytes (`core.autocrlf=true` silently converts the repository's LF-stored content to CRLF on checkout).
+The values below are now the canonical SHA-256 of the actual committed git blob (`git show HEAD:<path> | sha256sum`)
+— the bytes anyone gets from a plain clone regardless of platform or local `autocrlf` setting. They exactly match
+what `docs/PRE_RESULTS_AUDIT.md`'s own appendix independently reported; that audit's "hashes disagree" finding (A02)
+was correct, and this reviewer's original "A02 does not reproduce" rebuttal in
+`audit/SAM_RESPONSE_TO_PRE_RESULTS_AUDIT.md` was wrong — see that document's own correction note. The file
+*contents* were never wrong; only the byte representation used to hash them was. A repo-root `.gitattributes`
+(`* text=auto eol=lf`) now makes this explicit so it can't recur silently.
+
+| File | SHA-256 (canonical, LF-normalized) |
 |---|---|
-| `docs/R04_ACCOUNTING_AMENDMENT.md` | `4370744a1da7e5586912762e60b5ce8e4d5560ce63e7c572c6330d7eefde4abb` |
-| `tests/fixtures/accounting/README.md` | `ae60dd12b22bcc9257219dbdb4475e73ff0587b3442fb767c0cc1b917309df43` |
-| `tests/fixtures/accounting/A_feed.json` | `5412bbe2cb0e3e658f49280a4ceeb96720b2b16dfdc154fb9ab40533d31ce0ce` |
-| `tests/fixtures/accounting/B_unique.json` | `3c69ed5db8efb91b348b522c87069aaf1b95b5f8ceb2a6b9f5cedffb0b632a9f` |
-| `tests/fixtures/accounting/C_duplicate.json` | `a797a7a53d0d100d970dee2b1c5c3005e59963f2ee0230b9bb5affaa08901525` |
-| `tests/fixtures/accounting/D_nondedup.json` | `5682dd2ee68d2e7cc7385fc390fdaba0258514348b12d372957b528419fde01e` |
-| `tests/fixtures/accounting/E_fifo.json` | `2f0fa686f886a6f5d0a90f87df8e72d539872aea3a658ab6e5c10fdf13a696ea` |
-| `tests/fixtures/accounting/F_oversize.json` | `ce1e5afd11fdaac47865791430b7fb8243c4d0bb71ef8fbbd971de6d19caf999` |
-| `tests/fixtures/accounting/G_shared_fifo.json` | `e07f39048fa95e63bbc402adecdab870767ff3325004612cc1f7e7e3f74f0a7e` |
-| `tests/fixtures/accounting/H_protocol.json` | `da9c3da6018a9b35b5c6034a398960c183c1658d69e427b45210fb4c93750d14` |
-| `tests/fixtures/accounting/I_encoding.json` | `e61761488cd5a2d3a5ec5858866132175c6f456dbb17a7816de86c8d8f4dce50` |
+| `docs/R04_ACCOUNTING_AMENDMENT.md` | `3ccd0a5566cb31546455bc1a98b56bcc4369ea1d4e78f3f9f95f8e1adf573fbb` |
+| `tests/fixtures/accounting/README.md` | `3f604a6beb31a5ce0962a7041d37f5b72540ccf804469450328ab1918a78f586` |
+| `tests/fixtures/accounting/A_feed.json` | `f16c9066c5f30cc48e4c226510da24368cb4079012fee67ea76a54945b6a80bb` |
+| `tests/fixtures/accounting/B_unique.json` | `926df392e3a1c2682cae612aa51ef17a2f7857d163b4020ff130d95d0efe8320` |
+| `tests/fixtures/accounting/C_duplicate.json` | `5427dc744ff5fcf1c2219799b6840bfb0e15c95d47b547c6a4fddb627268e26b` |
+| `tests/fixtures/accounting/D_nondedup.json` | `101dcf53e881af1641173670abc0ceb3fd0bccd17eba3c590d7eaa4f67666ea8` |
+| `tests/fixtures/accounting/E_fifo.json` | `6d99644641b028bda6f33d4238562249c3bfe9839d5bb81e5e0f7aaed4c2e107` |
+| `tests/fixtures/accounting/F_oversize.json` | `8e5e289e5721b9ab1e2addf002cf34a5eb731a45aef3c8a60fed54cdacb3409c` |
+| `tests/fixtures/accounting/G_shared_fifo.json` | `6704dbf87693cfa67e01912c22bcc6c2a79dbaa69022d587d5cc46e8013cf89d` |
+| `tests/fixtures/accounting/H_protocol.json` | `178ae931e9469c360517ee0edfb6131e21b5da920f4ed2d6724168020f4290da` |
+| `tests/fixtures/accounting/I_encoding.json` | `f2013997173c8ca01b236052222fe1127c687d1608de1d8eef457375bf12e3a4` |
 
 If any of these files change, this acceptance no longer applies to the new version and must be redone against the new hashes.
 

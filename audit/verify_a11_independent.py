@@ -83,6 +83,22 @@ for ev in evidence:
 check("all 65 propositions' body hashes independently reproduce (own hashlib call, own encoding branch)", ev_hash_fail == 0, f"{ev_hash_fail} mismatches")
 check("all recorded source_spans independently reproduce (own char-slice, not the author checker's)", ev_span_fail == 0, f"{ev_span_fail} mismatches")
 
+print("\n=== 1b. Count reconciliation: does splits.json's own summary match a fresh count from evidence.jsonl? ===")
+# Added 2026-09-13 after finding annotations/A11_BENCHMARK_SPEC.md's prose (49 critical /
+# 16 non-critical, and a stale per-split table) did not match evidence.jsonl's own
+# `critical` field or splits.json's own `summary` block (both of which already said
+# 57/8). This check exists so that kind of doc/data drift fails loudly next time,
+# instead of silently propagating into PROJECT_STATUS.md the way it did here.
+real_critical = sum(1 for e in evidence if e["critical"])
+real_noncritical = len(evidence) - real_critical
+check("splits.json summary.critical_propositions matches a fresh count of evidence.jsonl's own critical field", splits["summary"]["critical_propositions"] == real_critical, f"summary={splits['summary']['critical_propositions']} recomputed={real_critical}")
+check("splits.json summary.non_critical_propositions matches a fresh count", splits["summary"]["non_critical_propositions"] == real_noncritical, f"summary={splits['summary']['non_critical_propositions']} recomputed={real_noncritical}")
+dev_ids_early = set(splits["splits"]["dev"]["evidence_ids"])
+held_ids_early = set(splits["splits"]["held_out"]["evidence_ids"])
+dev_rows = [e for e in evidence if e["evidence_id"] in dev_ids_early]
+held_rows = [e for e in evidence if e["evidence_id"] in held_ids_early]
+print(f"  INFO per-split (recomputed): dev={len(dev_rows)} evidence / {sum(1 for r in dev_rows if r['critical'])} critical -- held={len(held_rows)} evidence / {sum(1 for r in held_rows if r['critical'])} critical")
+
 print("\n=== 2. occurrences.jsonl: independently recomputed hash + span integrity (all occurrences) ===")
 check(f"occurrences.jsonl has {len(occurrences)} rows (claimed 1,361)", len(occurrences) == 1361, str(len(occurrences)))
 occ_hash_fail = occ_span_fail = occ_orphan = occ_evhash_mismatch = 0
@@ -109,8 +125,14 @@ check("every occurrence's own body_sha256 independently reproduces from its own 
 check("every occurrence's char_span independently reproduces its parent proposition's exact quotation text", occ_span_fail == 0, f"{occ_span_fail} mismatches")
 
 print("\n=== 3. Cross-file hash chain: does splits.json actually pin the files on disk? ===")
-ev_sha = hashlib.sha256(EV_FILE.read_bytes()).hexdigest()
-occ_sha = hashlib.sha256(OCC_FILE.read_bytes()).hexdigest()
+# Normalize CRLF->LF before hashing. A raw read_bytes() hash depends on the local
+# checkout's line-ending state (e.g. Windows core.autocrlf=true silently converts
+# the repository's real LF content to CRLF), which is exactly the bug that made
+# Sam's own hash checks unreproducible earlier in this project (see
+# audit/SAM_RESPONSE_TO_PRE_RESULTS_AUDIT.md's retraction note). Hashing the
+# canonical (LF) form matches what `git show HEAD:<path>` produces on any machine.
+ev_sha = hashlib.sha256(EV_FILE.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+occ_sha = hashlib.sha256(OCC_FILE.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 check("splits.json's pinned evidence.jsonl SHA-256 matches the file on disk", ev_sha == splits["checksums"]["evidence_jsonl_sha256"], f"disk={ev_sha[:12]} pinned={splits['checksums']['evidence_jsonl_sha256'][:12]}")
 check("splits.json's pinned occurrences.jsonl SHA-256 matches the file on disk", occ_sha == splits["checksums"]["occurrences_jsonl_sha256"], f"disk={occ_sha[:12]} pinned={splits['checksums']['occurrences_jsonl_sha256'][:12]}")
 

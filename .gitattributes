@@ -1,0 +1,10 @@
+# Added 2026-09-13 (Sam) after discovering every SHA-256 hash pinned in this repo's
+# frozen/accepted artifacts (R04 accounting fixtures, A11 evidence/occurrences) was
+# computed against a Windows working tree with core.autocrlf=true, which silently
+# converts LF to CRLF on checkout. Git's actual stored blob is LF-normalized, so a
+# fresh clone (or any machine without that specific local autocrlf setting) produces
+# different bytes -- and therefore a different SHA-256 -- than the one pinned in the
+# acceptance docs, even though the content is identical. This forces every checkout,
+# on every machine, to use the same (LF) line endings for these text formats, so a
+# SHA-256 of a locally-checked-out file always matches the committed blob.
+* text=auto eol=lf

@@ -89,8 +89,11 @@ print("\n--- 4. Verifying splits.json and isolation ---")
 with open(splits_file, "r", encoding="utf-8") as f:
     splits_data = json.load(f)
 
-ev_bytes = open(ev_file, "rb").read()
-occ_bytes = open(occ_file, "rb").read()
+# Normalize CRLF->LF before hashing so this matches the canonical git blob
+# (`git show HEAD:<path>`) regardless of the local checkout's line-ending
+# handling -- see splits.json's _checksum_domain_note for why this matters.
+ev_bytes = open(ev_file, "rb").read().replace(b"\r\n", b"\n")
+occ_bytes = open(occ_file, "rb").read().replace(b"\r\n", b"\n")
 ev_sha = hashlib.sha256(ev_bytes).hexdigest()
 occ_sha = hashlib.sha256(occ_bytes).hexdigest()
 
