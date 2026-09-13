@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
+from functools import lru_cache
+import json
 from typing import Literal
 
 from .accounting import MICROSECONDS_PER_HOUR, canonical_jsonl, elapsed_microseconds, format_timestamp, require_utc
@@ -24,6 +26,37 @@ class HashCollisionError(StorageError):
     """Equal SHA-256 digests were observed for unequal canonical bodies."""
 
 
+@lru_cache(maxsize=None)
+def _body_digest(body: bytes) -> str:
+    body.decode("utf-8", errors="strict")
+    return sha256(body).hexdigest()
+
+
+@lru_cache(maxsize=None)
+def _quoted(value: str) -> bytes:
+    return json.dumps(value, ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
+@lru_cache(maxsize=None)
+def _formatted(value: datetime) -> bytes:
+    return format_timestamp(value).encode("ascii")
+
+
+def _packet_bytes(page_key: str, capture_time: datetime, request_seq: int,
+                  digest: str, archive_key: str | None) -> bytes:
+    # This is the exact sorted-key canonical_jsonl layout for Capture.packet.
+    parts = [b'{']
+    if archive_key is not None:
+        parts.extend((b'"archive_key":', _quoted(archive_key), b','))
+    parts.extend((
+        b'"body_sha256":"', digest.encode("ascii"),
+        b'","capture_time":"', _formatted(capture_time),
+        b'","page_key":', _quoted(page_key),
+        b',"request_seq":', str(request_seq).encode("ascii"), b'}\n',
+    ))
+    return b''.join(parts)
+
+
 @dataclass(frozen=True, slots=True)
 class Capture:
     page_key: str
@@ -31,6 +64,8 @@ class Capture:
     request_seq: int
     body: bytes
     archive_key: str | None = None
+    _body_sha256: str = field(init=False, repr=False, compare=False)
+    _packet_bytes: bytes = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         require_utc(self.capture_time, "capture_time")
@@ -41,13 +76,17 @@ class Capture:
         if not isinstance(self.body, bytes):
             raise TypeError("body must be canonical UTF-8 bytes")
         try:
-            self.body.decode("utf-8", errors="strict")
+            digest = _body_digest(self.body)
         except UnicodeDecodeError as exc:
             raise ValueError("body must be valid canonical UTF-8") from exc
+        object.__setattr__(self, "_body_sha256", digest)
+        object.__setattr__(self, "_packet_bytes", _packet_bytes(
+            self.page_key, self.capture_time, self.request_seq, digest, self.archive_key
+        ))
 
     @property
     def body_sha256(self) -> str:
-        return sha256(self.body).hexdigest()
+        return self._body_sha256
 
     @property
     def packet(self) -> dict[str, object]:
@@ -63,7 +102,7 @@ class Capture:
 
     @property
     def packet_bytes(self) -> bytes:
-        return canonical_jsonl(self.packet)
+        return self._packet_bytes
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +200,7 @@ class CaptureStore:
         *,
         deduplicate: bool,
         start_time: datetime = HORIZON_START,
+        retain_history: bool = True,
     ) -> None:
         if capacity_bytes is not None and (type(capacity_bytes) is not int or capacity_bytes < 0):
             raise ValueError("capacity_bytes must be a nonnegative integer or None")
@@ -168,6 +208,7 @@ class CaptureStore:
             raise TypeError("deduplicate must be boolean")
         self.capacity_bytes = capacity_bytes
         self.deduplicate = deduplicate
+        self.retain_history = retain_history
         self._packets: deque[RetainedCapture] = deque()
         self._objects: dict[str, _BodyObject] = {}
         self._seen_request_seqs: set[int] = set()
@@ -184,6 +225,7 @@ class CaptureStore:
         self._audit: list[StorageAuditRecord] = []
         self._size_history: list[int] = [0]
         self._accounting_points: list[tuple[datetime, int]] = [(self._last_time, 0)]
+        self._max_request_seq = 0
 
     @classmethod
     def from_retained_export(cls, export: RetainedStoreExport) -> "CaptureStore":
@@ -275,18 +317,37 @@ class CaptureStore:
             self._body_bytes -= body_len
             self._evicted_body_bytes += body_len
             del self._objects[oldest.object_id]
-        self._size_history.append(self.current_bytes)
-        self._accounting_points.append((self._last_time, self.current_bytes))
+        if self.retain_history:
+            self._size_history.append(self.current_bytes)
+        self._record_accounting(self._last_time, self.current_bytes)
         return oldest.request_seq
+
+    def _record_accounting(self, timestamp: datetime, value: int) -> None:
+        if self.retain_history:
+            self._accounting_points.append((timestamp, value))
+            return
+        if self._accounting_points and self._accounting_points[-1][0] == timestamp:
+            values: list[int] = []
+            while self._accounting_points and self._accounting_points[-1][0] == timestamp:
+                values.append(self._accounting_points.pop()[1])
+            maximum = max(values + [value])
+            self._accounting_points.append((timestamp, maximum))
+            if value != maximum:
+                self._accounting_points.append((timestamp, value))
+        else:
+            self._accounting_points.append((timestamp, value))
 
     def admit(self, capture: Capture) -> AdmissionResult:
         order = (require_utc(capture.capture_time), capture.request_seq, capture.page_key)
         if self._last_order is not None and order < self._last_order:
             raise AdmissionOrderError("admissions must follow (response_time, request_seq, page_key)")
-        if capture.request_seq in self._seen_request_seqs:
+        if (capture.request_seq in self._seen_request_seqs if self.retain_history
+                else capture.request_seq <= self._max_request_seq):
             raise StorageError(f"request_seq {capture.request_seq} was already presented")
         self._last_order = order
-        self._seen_request_seqs.add(capture.request_seq)
+        if self.retain_history:
+            self._seen_request_seqs.add(capture.request_seq)
+        self._max_request_seq = capture.request_seq
         self._advance(capture.capture_time)
 
         packet = capture.packet_bytes
@@ -294,12 +355,14 @@ class CaptureStore:
         standalone = p + b
         if self.capacity_bytes is not None and standalone > self.capacity_bytes:
             self._oversize += 1
-            self._size_history.append(self.current_bytes)
+            if self.retain_history:
+                self._size_history.append(self.current_bytes)
             audit = StorageAuditRecord(
                 capture.request_seq, capture.page_key, capture.capture_time,
                 capture.body_sha256, b, p, "oversize", (),
             )
-            self._audit.append(audit)
+            if self.retain_history:
+                self._audit.append(audit)
             return AdmissionResult("oversize", capture.request_seq, p, b, standalone, None, (), self.current_bytes)
 
         shared = self._has_equal_shared_body(capture)
@@ -329,12 +392,14 @@ class CaptureStore:
         self._packet_bytes += p
         self._admitted += 1
         self._peak_bytes = max(self._peak_bytes, self.current_bytes)
-        self._size_history.append(self.current_bytes)
-        self._accounting_points.append((capture.capture_time, self.current_bytes))
-        self._audit.append(StorageAuditRecord(
-            capture.request_seq, capture.page_key, capture.capture_time,
-            capture.body_sha256, b, p, "admitted", tuple(evicted),
-        ))
+        if self.retain_history:
+            self._size_history.append(self.current_bytes)
+        self._record_accounting(capture.capture_time, self.current_bytes)
+        if self.retain_history:
+            self._audit.append(StorageAuditRecord(
+                capture.request_seq, capture.page_key, capture.capture_time,
+                capture.body_sha256, b, p, "admitted", tuple(evicted),
+            ))
         if self.capacity_bytes is not None and self.current_bytes > self.capacity_bytes:
             raise AssertionError("store capacity invariant violated")
         return AdmissionResult(

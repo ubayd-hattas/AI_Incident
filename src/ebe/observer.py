@@ -56,6 +56,9 @@ class BodyOutcome(str, Enum):
     UNSUPPORTED = "unsupported"
 
 
+_BODY_HEADERS = {outcome: canonical_jsonl({"outcome": outcome.value}) for outcome in BodyOutcome}
+
+
 @dataclass(frozen=True, slots=True)
 class ObserverConfig:
     feed_publication_lag_us: int = 5_000_000
@@ -190,8 +193,12 @@ class _FeedEntry:
 class Observer:
     """Stateful feed/discovery/GET boundary hiding all TraceModel internals."""
 
-    def __init__(self, export: NormalizedExport, *, config: ObserverConfig | None = None) -> None:
+    def __init__(self, export: NormalizedExport, *, config: ObserverConfig | None = None,
+                 retain_diagnostics: bool = True) -> None:
+        if not isinstance(retain_diagnostics, bool):
+            raise TypeError("retain_diagnostics must be boolean")
         self.config = config or ObserverConfig()
+        self.retain_diagnostics = retain_diagnostics
         self._trace = TraceModel(export)
         entries: list[_FeedEntry] = []
         lag = timedelta(microseconds=self.config.feed_publication_lag_us)
@@ -249,6 +256,10 @@ class Observer:
         self._directory_audit: list[tuple[datetime, int]] = []
         self._metadata_additions: list[tuple[datetime, int]] = []
         self._pending_states: dict[int, _PendingState] = {}
+        self._nominal_outcome_cache: dict[tuple[str, int], tuple[BodyOutcome, bytes | None]] = {}
+        self._canonical_body_cache: dict[tuple[str, str], bytes] = {}
+        self._feed_metadata = 0
+        self._directory_metadata = 0
 
     @property
     def discovered_titles(self) -> tuple[str, ...]:
@@ -307,13 +318,19 @@ class Observer:
             self._discovered.add(record.page_key)
             self._shared_metadata += len(record.canonical_bytes)
         retained_addition = sum(len(record.canonical_bytes) for record in visible)
-        self._feed_audit.append((poll_time, len(response), retained_addition))
+        self._feed_metadata += len(response)
+        if self.retain_diagnostics:
+            self._feed_audit.append((poll_time, len(response), retained_addition))
         if retained_addition:
             self._metadata_additions.append((poll_time, retained_addition))
         self._peak_shared_metadata = max(self._peak_shared_metadata, self._shared_metadata)
         return FeedPollResult(poll_time, tuple(visible), response)
 
     def _canonical_body(self, state_body_ref: object) -> bytes:
+        identity = (state_body_ref.rev_id, state_body_ref.body_sha256)  # type: ignore[attr-defined]
+        cached = self._canonical_body_cache.get(identity)
+        if cached is not None:
+            return cached
         source_bytes = state_body_ref.source_bytes  # type: ignore[attr-defined]
         encoding = state_body_ref.source_encoding  # type: ignore[attr-defined]
         if encoding == "ascii":
@@ -324,9 +341,15 @@ class Observer:
             text = source_bytes.decode("latin-1", errors="strict")
         else:
             raise ObserverError(f"unsupported validated source body encoding {encoding!r}")
-        return text.encode("utf-8")
+        canonical = text.encode("utf-8")
+        self._canonical_body_cache[identity] = canonical
+        return canonical
 
     def _observe_state(self, page_key: str, response_time: datetime) -> tuple[BodyOutcome, bytes | None]:
+        interval = self._trace.nominal_interval_key(page_key, response_time)
+        cached = self._nominal_outcome_cache.get((page_key, interval))
+        if cached is not None:
+            return cached
         try:
             query = self._trace.state_at(page_key, response_time, mode="nominal")
         except (UnsupportedMutationError, AmbiguityLimitError):
@@ -343,9 +366,10 @@ class Observer:
                 possibilities.add((BodyOutcome.BODY_UNKNOWN, None))
             else:
                 possibilities.add((BodyOutcome.UNKNOWN, None))
-        if len(possibilities) != 1:
-            return BodyOutcome.AMBIGUOUS, None
-        return next(iter(possibilities))
+        result = ((BodyOutcome.AMBIGUOUS, None) if len(possibilities) != 1
+                  else next(iter(possibilities)))
+        self._nominal_outcome_cache[(page_key, interval)] = result
+        return result
 
     def get_body(self, page_key: str, request_time: datetime) -> BodyResponse | PendingBodyRequest:
         if not isinstance(page_key, str):
@@ -368,9 +392,10 @@ class Observer:
         response_time = request_time + timedelta(microseconds=self.config.get_response_delay_us)
         if response_time > HORIZON_END or self.config.get_response_delay_us:
             self._pending += 1
-            self._audit.append(ObserverAuditRecord(
-                request_seq, page_key, request_time, None, None, 0, None, "pending"
-            ))
+            if self.retain_diagnostics:
+                self._audit.append(ObserverAuditRecord(
+                    request_seq, page_key, request_time, None, None, 0, None, "pending"
+                ))
             handle = PendingBodyRequest(page_key, request_seq, request_time, response_time)
             self._pending_states[request_seq] = _PendingState(handle)
             return handle
@@ -379,7 +404,7 @@ class Observer:
             outcome, body = BodyOutcome.UNKNOWN, None
         else:
             outcome, body = self._observe_state(page_key, response_time)
-        header = canonical_jsonl({"outcome": outcome.value})
+        header = _BODY_HEADERS[outcome]
         self._outcomes[outcome] += 1
         self._downloaded_metadata += len(header)
         if outcome is BodyOutcome.BODY:
@@ -394,10 +419,11 @@ class Observer:
             disposition = "review_required" if outcome in {BodyOutcome.AMBIGUOUS, BodyOutcome.UNSUPPORTED} else "no_body"
             body_length = None
             self._unknown_body_attempts += 1
-        self._audit.append(ObserverAuditRecord(
-            request_seq, page_key, request_time, response_time, outcome.value,
-            len(header), body_length, disposition,
-        ))
+        if self.retain_diagnostics:
+            self._audit.append(ObserverAuditRecord(
+                request_seq, page_key, request_time, response_time, outcome.value,
+                len(header), body_length, disposition,
+            ))
         return BodyResponse(page_key, request_seq, request_time, response_time, outcome, header, body)
 
     def complete_due(self, through_time: datetime) -> tuple[BodyResponse, ...]:
@@ -415,7 +441,7 @@ class Observer:
                 outcome, body = BodyOutcome.UNKNOWN, None
             else:
                 outcome, body = self._observe_state(handle.page_key, handle.response_time)
-            header = canonical_jsonl({"outcome": outcome.value})
+            header = _BODY_HEADERS[outcome]
             self._outcomes[outcome] += 1
             self._downloaded_metadata += len(header)
             disposition: Literal["no_body", "available", "pending", "review_required"]
@@ -428,10 +454,11 @@ class Observer:
                 body_length = None
                 self._unknown_body_attempts += 1
                 disposition = "review_required" if outcome in {BodyOutcome.AMBIGUOUS, BodyOutcome.UNSUPPORTED} else "no_body"
-            index = next(i for i, record in enumerate(self._audit) if record.request_seq == handle.request_seq)
-            self._audit[index] = ObserverAuditRecord(handle.request_seq, handle.page_key,
-                handle.request_time, handle.response_time, outcome.value, len(header),
-                body_length, disposition)
+            if self.retain_diagnostics:
+                index = next(i for i, record in enumerate(self._audit) if record.request_seq == handle.request_seq)
+                self._audit[index] = ObserverAuditRecord(handle.request_seq, handle.page_key,
+                    handle.request_time, handle.response_time, outcome.value, len(header),
+                    body_length, disposition)
             self._pending -= 1
             del self._pending_states[handle.request_seq]
             completed.append(BodyResponse(handle.page_key, handle.request_seq,
@@ -469,6 +496,7 @@ class Observer:
         self._non_body_metadata += len(response)
         self._shared_metadata += len(response)
         self._directory_audit.append((request_time, len(response)))
+        self._directory_metadata += len(response)
         self._metadata_additions.append((request_time, len(response)))
         self._peak_shared_metadata = max(self._peak_shared_metadata, self._shared_metadata)
         self._discovered.update(page_keys)
@@ -476,6 +504,28 @@ class Observer:
 
     def costs(self, checkpoint: datetime | None = None) -> ObserverCosts:
         cutoff = HORIZON_END if checkpoint is None else self._horizon_time(checkpoint, "checkpoint")
+        if not self.retain_diagnostics:
+            if cutoff < self._operation_clock:
+                raise ObserverError("compact costs cannot reconstruct a past cutoff")
+            accounting_points: list[tuple[datetime, int]] = [(HORIZON_START, 0)]
+            running_for_points = 0
+            for when, amount in sorted(self._metadata_additions):
+                if when > cutoff:
+                    continue
+                running_for_points += amount
+                accounting_points.append((when, running_for_points))
+            lower = self._downloaded_metadata + self._downloaded_body
+            return ObserverCosts(
+                self._feed_requests, self._directory_requests, self._body_requests,
+                self._outcomes[BodyOutcome.BODY], self._outcomes[BodyOutcome.MISSING],
+                self._outcomes[BodyOutcome.UNKNOWN], self._outcomes[BodyOutcome.BODY_UNKNOWN],
+                self._outcomes[BodyOutcome.AMBIGUOUS], self._outcomes[BodyOutcome.UNSUPPORTED],
+                self._pending, self._downloaded_metadata, self._downloaded_body,
+                self._unknown_body_attempts, lower, None if self._unknown_body_attempts else lower,
+                self._shared_metadata, self._peak_shared_metadata, self._shared_metadata,
+                self._metadata_byte_microseconds + self._shared_metadata * elapsed_microseconds(self._metadata_time, cutoff),
+                self._feed_metadata, self._directory_metadata, tuple(accounting_points),
+            )
         additions = [(when, amount) for when, amount in self._metadata_additions if when <= cutoff]
         retained_metadata = sum(amount for _, amount in additions)
         running = peak_metadata = accrued = 0

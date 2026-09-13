@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from hashlib import sha256
 from itertools import combinations, permutations
+from bisect import bisect_right
 from typing import Iterable, Iterator, Literal
 
 from .schema import (
@@ -209,6 +210,8 @@ class PageTimeline:
     ) -> None:
         self.page_key = page_key
         self._mutations = mutations
+        self._selected_times = tuple(item.timing.selected_time for item in mutations)
+        self._nominal_cache: dict[int, tuple[tuple[_Branch, ...], tuple[str, ...]]] = {}
         self.ignored_markers = ignored_markers
         self.max_trajectories = max_trajectories
 
@@ -231,7 +234,12 @@ class PageTimeline:
         return _query(self.page_key, timestamp, mode, branches, reasons)
 
     def _nominal(self, timestamp: datetime) -> tuple[list[_Branch], list[str]]:
-        eligible = [item for item in self._mutations if item.timing.selected_time <= timestamp]
+        prefix = bisect_right(self._selected_times, timestamp)
+        cached = self._nominal_cache.get(prefix)
+        if cached is not None:
+            branches, reasons = cached
+            return list(branches), list(reasons)
+        eligible = self._mutations[:prefix]
         branches = [_Branch()]
         reasons: list[str] = []
         index = 0
@@ -246,7 +254,14 @@ class PageTimeline:
                 reasons.append(f"same-time group at {boundary.isoformat()} has source-permitted orderings")
             branches = self._extend(branches, orders, pending=())
             index = end
+        self._nominal_cache[prefix] = (tuple(branches), tuple(reasons))
         return branches, reasons
+
+    def nominal_interval_key(self, timestamp: datetime) -> int:
+        """Return the immutable selected-time prefix containing ``timestamp``."""
+
+        timestamp = _query_time(timestamp)
+        return bisect_right(self._selected_times, timestamp)
 
     def _uncertainty(self, timestamp: datetime) -> tuple[list[_Branch], list[str]]:
         branches = [_Branch()]
@@ -390,6 +405,11 @@ class TraceModel:
         mode: Literal["nominal", "uncertainty"] = "nominal",
     ) -> StateQuery:
         return self.timeline(page_key).state_at(timestamp, mode=mode)
+
+    def nominal_interval_key(self, page_key: str, timestamp: datetime) -> int:
+        """Identify an exact nominal state interval without reconstructing it."""
+
+        return self.timeline(page_key).nominal_interval_key(timestamp)
 
 
 def build_timeline(
