@@ -157,6 +157,9 @@ class CollectorResult:
     retained_evidence: tuple[RetainedEvidenceUnit, ...] = ()
     retained_export: RetainedStoreExport | None = None
     repair_metadata_peak_bytes: int | None = None
+    body_request_count: int | None = None
+    capture_attempt_count: int | None = None
+    capture_admitted_count: int | None = None
 
     @property
     def requests_made(self) -> int:
@@ -165,11 +168,13 @@ class CollectorResult:
 
     @property
     def captures_attempted(self) -> int:
-        return len(self.capture_attempts)
+        return (len(self.capture_attempts) if self.capture_attempt_count is None
+                else self.capture_attempt_count)
 
     @property
     def captures_admitted(self) -> int:
-        return sum(item.admission.disposition == "admitted" for item in self.capture_attempts)
+        return (sum(item.admission.disposition == "admitted" for item in self.capture_attempts)
+                if self.capture_admitted_count is None else self.capture_admitted_count)
 
     @property
     def outcome_counts(self) -> tuple[tuple[str, int], ...]:
@@ -219,11 +224,12 @@ def periodic_sweep_times(
 class PeriodicCollector:
     """Run P, PD, or PCD using only an already-constructed E08 observer."""
 
-    def __init__(self, observer: Observer, config: PeriodicConfig) -> None:
+    def __init__(self, observer: Observer, config: PeriodicConfig, *, compact: bool = False) -> None:
         if not isinstance(observer, Observer):
             raise TypeError("observer must be an E08 Observer")
         self.observer = observer
         self.config = config
+        self.compact = compact
 
     def run(self) -> CollectorResult:
         config = self.config
@@ -234,6 +240,7 @@ class PeriodicCollector:
             config.capacity_bytes,
             deduplicate=deduplicate,
             start_time=HORIZON_START,
+            retain_history=not self.compact,
         )
         beliefs: dict[str, _Belief] = {}
         dirty: set[str] = set()
@@ -242,6 +249,8 @@ class PeriodicCollector:
         body_results: list[BodyResponse | PendingBodyRequest] = []
         peak_discovered = 0
         peak_dirty = 0
+        capture_attempt_count = 0
+        capture_admitted_count = 0
 
         sweep_iter = iter(periodic_sweep_times(
             config.interval_us, config.phase_us, checkpoint=config.checkpoint
@@ -256,7 +265,8 @@ class PeriodicCollector:
                 next_sweep is None or next_poll <= next_sweep
             ):
                 poll = self.observer.poll_feed(next_poll)
-                polls.append(poll)
+                if not self.compact or poll.records:
+                    polls.append(poll)
                 self._apply_feed_batch(poll, beliefs, dirty)
                 peak_discovered = max(peak_discovered, len(beliefs))
                 peak_dirty = max(peak_dirty, len(dirty))
@@ -264,7 +274,8 @@ class PeriodicCollector:
                 continue
 
             assert next_sweep is not None
-            sweeps.append(next_sweep)
+            if not self.compact:
+                sweeps.append(next_sweep)
             if config.policy in {PeriodicPolicy.PCD, PeriodicPolicy.PCD_R}:
                 eligible = sorted(
                     page_key
@@ -280,7 +291,17 @@ class PeriodicCollector:
             if config.service_order == "reverse":
                 eligible.reverse()
             for page_key in eligible:
-                body_results.append(self.observer.get_body(page_key, next_sweep))
+                response = self.observer.get_body(page_key, next_sweep)
+                if self.compact and isinstance(response, BodyResponse):
+                    if response.outcome is BodyOutcome.BODY:
+                        assert response.body is not None
+                        capture = Capture(response.page_key, response.response_time,
+                                          response.request_seq, response.body)
+                        admission = store.admit(capture)
+                        capture_attempt_count += 1
+                        capture_admitted_count += admission.disposition == "admitted"
+                else:
+                    body_results.append(response)
             if config.policy in {PeriodicPolicy.PCD, PeriodicPolicy.PCD_R}:
                 # A sweep is the frozen service point. Every eligible dirty title was
                 # attempted; confirmed deletes were already removed on feed delivery.
@@ -308,7 +329,17 @@ class PeriodicCollector:
                 response.request_seq,
                 response.body,
             )
-            attempts.append(CaptureAttempt(capture, store.admit(capture)))
+            admission = store.admit(capture)
+            if self.compact:
+                capture_attempt_count += 1
+                capture_admitted_count += admission.disposition == "admitted"
+            else:
+                attempts.append(CaptureAttempt(capture, admission))
+        if not self.compact:
+            capture_attempt_count = len(attempts)
+            capture_admitted_count = sum(
+                item.admission.disposition == "admitted" for item in attempts
+            )
 
         snapshot = store.snapshot(config.checkpoint)
         retained_evidence = tuple(
@@ -332,6 +363,9 @@ class PeriodicCollector:
             peak_dirty,
             retained_evidence=retained_evidence,
             retained_export=store.export_retained(config.checkpoint),
+            body_request_count=self.observer.costs(config.checkpoint).body_requests,
+            capture_attempt_count=capture_attempt_count,
+            capture_admitted_count=capture_admitted_count,
         )
 
     def _run_repair(self) -> CollectorResult:
@@ -476,10 +510,10 @@ class PeriodicCollector:
             index = end
 
 
-def run_periodic(observer: Observer, config: PeriodicConfig) -> CollectorResult:
+def run_periodic(observer: Observer, config: PeriodicConfig, *, compact: bool = False) -> CollectorResult:
     """Convenience entry point for one deterministic E09 periodic run."""
 
-    return PeriodicCollector(observer, config).run()
+    return PeriodicCollector(observer, config, compact=compact).run()
 
 
 class EventDerivedCollector:

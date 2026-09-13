@@ -115,7 +115,9 @@ def augment_collector_result(export: NormalizedExport, result) -> TerminalCollec
     if retained.checkpoint != HORIZON_END:
         raise ValueError("persistent augmentation is terminal-only")
     store = CaptureStore.from_retained_export(retained)
-    prefix_seq = max((item.request_seq for item in result.body_results), default=0)
+    # Compact runner mode intentionally omits per-request response objects; the
+    # observer's exact body-request counter is the same terminal sequence value.
+    prefix_seq = result.observer_costs.body_requests
     return append_terminal_archive(export, store, request_seq_start=prefix_seq,
                                    checkpoint=retained.checkpoint)
 

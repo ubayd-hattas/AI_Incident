@@ -227,10 +227,10 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
         policy = cfg["policy"]
         result = None; terminal = None
         if policy in {"P", "PD", "PCD", "PCD-R"}:
-            result = run_periodic(Observer(export, config=observer_cfg), PeriodicConfig(
+            result = run_periodic(Observer(export, config=observer_cfg, retain_diagnostics=False), PeriodicConfig(
                 PeriodicPolicy(policy), cfg["interval_us"], cfg["phase_us"],
                 cfg["capacity_bytes"], checkpoint,
-                "reverse" if cfg["order"] == "reverse" else "forward"))
+                "reverse" if cfg["order"] == "reverse" else "forward"), compact=True)
         elif policy == "E":
             result = run_event_derived(Observer(export, config=observer_cfg),
                 EventDerivedConfig(cfg["q"], cfg["capacity_bytes"], checkpoint,
