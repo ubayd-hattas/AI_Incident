@@ -333,18 +333,38 @@ check("ENCODING BUG: occurrences.jsonl body_sha256 matches the TRUE source bytes
 
 from ebe.a11_loader import load_a11_benchmark  # noqa: E402
 _bm = load_a11_benchmark(fail_on_error=False)
-check("FIXED: the real loader's own hash check now independently catches this same encoding bug", not _bm.validation.valid and any("HASH" in i.code for i in _bm.validation.issues), f"loader reports valid={_bm.validation.valid}, {len(_bm.validation.issues)} issues")
+_independent_hash_defect = bool(_ev_mismatches) or bool(_occ_mismatches)
+_loader_reports_hash_issue = any("HASH" in i.code for i in _bm.validation.issues)
 print(f"  INFO loader issue breakdown: {dict(__import__('collections').Counter(i.code for i in _bm.validation.issues))}")
-print("  INFO the 2 EVIDENCE_BODY_HASH_MISMATCH rows cascade into 2 ELIGIBLE_CRITICAL_WITHOUT_CORE_SUPPORT issues once their")
-print("       corrupted occurrences are correctly rejected -- this is the correct fail-closed consequence, not a new bug:")
-print("       load_a11_benchmark(fail_on_error=True) (the default) now correctly REFUSES to load real A11 data until")
-print("       PROP-20260617-17/-18 and their occurrences are fixed by the annotation team. This is the annotation-layer")
-print("       blocker the user's own note refers to -- do not treat it as cleared by this script alone.")
+check(
+    "the real loader's own hash check agrees with this script's independent from-scratch recomputation "
+    "(both clean, or both catching the same defect -- not asserting which state is 'correct')",
+    _loader_reports_hash_issue == _independent_hash_defect,
+    f"independent recomputation found a defect={_independent_hash_defect}, loader reports a HASH issue={_loader_reports_hash_issue}",
+)
+if _independent_hash_defect:
+    print("  INFO a source-encoding hash defect is present in the frozen annotation files (per this script's own")
+    print("       independent recomputation, not the loader's report) -- this is the annotation-layer blocker; a fix")
+    print("       requires the annotation team to correct evidence.jsonl/occurrences.jsonl, not this script or E12 code.")
 try:
     load_a11_benchmark()
-    check("load_a11_benchmark(fail_on_error=True) (the real default) currently raises on real data (annotation layer not yet green)", False, "did not raise -- unexpected, means the annotation data is clean")
+    _default_raised = False
 except DenominatorFirewallError:
-    check("load_a11_benchmark(fail_on_error=True) (the real default) currently raises on real data (annotation layer not yet green)", True)
+    _default_raised = True
+check(
+    "load_a11_benchmark(fail_on_error=True) (the real default) raises iff this script's own independent "
+    "recomputation found a real hash defect (not asserting the annotation layer's state either way)",
+    _default_raised == _independent_hash_defect,
+    f"independent defect found={_independent_hash_defect}, default loader raised={_default_raised}",
+)
+if not _independent_hash_defect:
+    print("  INFO independently confirmed (fresh sha256(body.encode('latin-1')) recomputation against evidence.jsonl/")
+    print("       occurrences.jsonl's own recorded hashes, not trusting the loader or any PASS report): the source-")
+    print("       encoding hash provenance defect this review originally found (2 evidence + 80 occurrence rows) is no")
+    print("       longer present. This confirms only the hash/encoding provenance repair -- it is NOT a rerun of the")
+    print("       full E12 independent acceptance review (pilot leakage, PROP-20260618-63 eligibility, epistemic-leakage")
+    print("       prose, split isolation, context/delay sections were not re-checked here) and does not by itself amend")
+    print("       audit/E12_INDEPENDENT_ACCEPTANCE.md's CONDITIONAL PASS verdict.")
 
 print("\n" + "=" * 60)
 print(f"FINAL GRAND TOTAL FAILURES: {len(FAILURES)}")
