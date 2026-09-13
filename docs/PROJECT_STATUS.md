@@ -73,6 +73,8 @@ The following claims were recorded before this closure check. In particular, the
 
 ## 3. Are we getting there? — ticket tracker
 
+**2026-09-13 E12 update:** The core-evidence evaluator candidate is implemented in `src/ebe/evaluator.py` and `src/ebe/a11_loader.py`, with its contract in `docs/E12_EVALUATOR.md`. It consumes all four frozen A11 artifacts, validates exact occurrence support and A05 split/group/eligibility invariants, builds body-hash-pinned occurrence alternatives, supports dev/held-out/full and critical-only evaluation, and computes three-state delay from retained snapshots only. The draft context artifacts remain disconnected; context reports `NOT_FROZEN`/NA. This implementation has not joined A11 to any real collector result and has not run a policy comparison or X13. X13 remains NOT AUTHORIZED.
+
 Ticket IDs match `EXECUTION_SPEC_v0.1.md` §7. This is the real gauge — check this section, not your memory of the plan.
 
 | Ticket | Owner | What it is | Status | Evidence |
