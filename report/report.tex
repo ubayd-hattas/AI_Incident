@@ -1,0 +1,479 @@
+% ============================================================================
+% EVIDENCE BEFORE ERASURE -- Research report scaffold (Track 2)
+% ============================================================================
+%
+% READ THIS BLOCK BEFORE YOU SUBMIT ANYTHING.
+%
+% 1. THIS IS SCAFFOLDING, NOT A FINISHED REPORT. Every bullet list in this file
+%    is fact-dense NOTES pulled from the project's own audit trail (with a
+%    citation to where each fact lives), not finished prose. The sprint's own
+%    rules say a report "may be penalized if it reads as generated rather than
+%    written by the team" (padded sections, generic framing, claims without
+%    sources). Turn these bullets into your own sentences. Do not submit this
+%    file's bullet lists as flowing paragraphs verbatim.
+%
+% 2. THE OFFICIAL TEMPLATE IS A GOOGLE DOC, not LaTeX:
+%    https://docs.google.com/document/d/1PQBlhI3tM5vb51x7jBWXBQMYg6hkiU_x8RaCws4kjl4/copy?usp=sharing
+%    The FAQ says to always use whatever is linked on the Guidelines tab (the
+%    copy in acceptance emails may be stale). This .tex file matches the
+%    REQUIRED STRUCTURE AND LIMITS (8 pages excl. refs/appendices, abstract
+%    <=150 words, required Limitations & Dual-Use appendix, author/affiliation
+%    block) -- but before final submission, either port this content into the
+%    actual Google Doc template, or confirm a LaTeX PDF is acceptable in this
+%    round's Guidelines tab.
+%
+% 3. RESULTS ARE NOT YET REAL. X13 (the actual experiment) has not been run as
+%    of this draft -- only Gate 1 (engineering) and Gate 2 (independent
+%    readiness) have passed. Every number in \S Results is marked PENDING.
+%    Do not invent numbers to fill the gap; an honest "results pending, here is
+%    exactly what will be reported and how" is a legitimate, common thing to
+%    submit under time pressure, and is far better than a fabricated number.
+%
+% 4. FILL IN: author names/affiliations, the exact title (a working title is
+%    given below), and every [TODO] marker.
+%
+% Compile with pdflatex (no exotic packages; should work on Overleaf or a
+% local TeXLive install unmodified).
+% ============================================================================
+
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{times}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage[table]{xcolor}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black
+}
+
+\titlespacing*{\section}{0pt}{12pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small Evidence Before Erasure --- Draft, not for distribution}
+\fancyhead[R]{\small \thepage}
+\renewcommand{\headrulewidth}{0.2pt}
+
+% Simple TODO/pending markers, visible in the compiled PDF so nobody forgets
+% to resolve them before submission.
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\pending}[1]{\textcolor{orange!80!black}{\textbf{[PENDING -- #1]}}}
+
+\title{\vspace{-1.5em}
+  Evidence Before Erasure: Does Event-Driven Monitoring Preserve\\
+  More Forensic Evidence of AI Agent Actions Than Periodic Polling?\\
+  \todo{confirm/replace working title}}
+
+\author{
+  \todo{Author 1 Name}$^{1}$ \quad
+  \todo{Author 2 Name}$^{1}$ \quad
+  \todo{Author 3 Name}$^{1}$ \quad
+  \todo{Author 4 Name}$^{1}$ \\[4pt]
+  \small $^{1}$\todo{affiliation(s)} \\
+  \small \texttt{\todo{contact email(s)}}
+}
+\date{\today}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+\noindent
+% ABSTRACT -- HARD LIMIT 150 WORDS. Count before submitting.
+% Draft below is ~140 words; trim/rewrite in your own words.
+When an AI agent takes an action inside a shared, mutable environment
+(edits a page, coordinates with other agents, deletes evidence of its own
+behavior), the trace of that action has a finite shelf life: it can be
+overwritten, deleted, or evicted from a storage-capped monitor before anyone
+looks. We study, in a trace-grounded simulation of a wiki-like environment
+populated by autonomous agents, whether a simple time-interval polling
+monitor retains less \emph{critical forensic evidence} of agent actions than
+a budget-matched, event-driven monitor under identical storage and request
+constraints. We built and independently, adversarially audited a 65-item
+human-labeled benchmark of concrete agent behaviors (including deliberate
+evasion patterns such as backup-page creation before deletion) and a
+retained-only evaluator with a formally specified causal-ordering model.
+\pending{one-sentence headline result once X13 has run}.
+\end{abstract}
+
+\vspace{0.5em}
+\noindent\textbf{Keywords:} \todo{3--5 keywords, e.g. AI incident response,
+observability, evidence retention, monitoring policy, simulation}
+
+% ==========================================================================
+\section{Introduction}
+% ==========================================================================
+% Required content per the sprint rubric: which track/sub-problem, why it
+% matters, what the artifact is for. Write 3-5 short paragraphs from these
+% points -- do not just list them.
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Track and problem.} Track 2 (AI Incident Response). The
+    sub-problem: incident response depends on evidence surviving long enough
+    to be collected; monitoring/logging design choices (poll interval,
+    storage cap, feed- vs. schedule-driven collection) determine what
+    evidence is even \emph{retrievable} after the fact, independent of
+    whether the incident was ever noticed in time.
+  \item \textbf{Why it matters.} This reframes ``AI incident response'' as
+    partly an information-preservation/observability engineering problem, not
+    only a detection problem. If a monitoring architecture systematically
+    loses certain classes of evidence (e.g., self-erasing or fast-mutating
+    agent behavior), post-hoc investigation of an incident can fail even when
+    the incident is eventually flagged --- the evidence needed to explain it
+    is already gone. \todo{cite 1-2 real incident-response / observability
+    sources establishing that evidence retention -- not just detection -- is
+    a recognized bottleneck; the sprint rubric penalizes claims without
+    sources}.
+  \item \textbf{Concrete motivating example (use this -- it is real, already
+    independently re-verified, and concrete).} In the simulated corpus, an
+    agent (handle \texttt{Aug17ConstructionAgent}) posted a warning that a
+    "wiki cleanup/deletion sweep appears active," naming a specific backup
+    page to use if the original vanished. 96 seconds later that backup page
+    (\texttt{ZZZDataUSAConstructionWageLive}) was created. The original page
+    and the backup page were then deleted 12 seconds apart. Every timestamp
+    and hash in this example was independently re-derived from the raw
+    revision/event export, not copied from a prior summary
+    (\texttt{docs/JUDGE\_WALKTHROUGH.md}). This is exactly the shape of
+    evidence a badly-timed or too-infrequent monitor would miss entirely.
+  \item \textbf{What the artifact is.} (a) A frozen, hand-adjudicated
+    benchmark of 65 ``critical'' agent-behavior propositions grounded in a
+    13,000+-revision simulated wiki trace, each requiring exact retained
+    textual evidence (and, for 8 of the 65, additional context); (b) a
+    retained-only evaluator with a formally specified causal-ordering model
+    (an operation clock that provably agrees between a full run and a
+    truncated ``fresh prefix'' up to any checkpoint); (c) a comparison
+    harness for periodic (P/PD/PCD at several intervals) vs.\ event-driven
+    (token-bucket-rate-limited) collection, plus four adversarial ``hostile
+    controls'' (a low-information baseline, an online repair variant, a
+    reversed-service-order stress test, and a terminal archive-augmentation
+    control) built specifically to stress-test whether any observed
+    difference is an artifact of an unfair comparison.
+  \item \textbf{Scope discipline (worth stating explicitly in the report --
+    it is unusual and a strength, not a hedge).} The primary contrast, the
+    benchmark, the denominator (held-out critical core, $K=23$), and the
+    decision threshold were frozen \emph{before} any real result was
+    computed; every methodological repair found during audit was applied
+    outcome-blind. \todo{state plainly, once results exist, whether any
+    parameter was changed after seeing a result --- if none were, say so
+    explicitly, it is a real strength}.
+\end{itemize}
+
+% ==========================================================================
+\section{Related Work}
+% ==========================================================================
+% Required: what prior work this builds on, what it already does, what gap
+% remains, what is new here. \todo -- this section needs real citations the
+% team gathers; do not let an AI tool invent citations.
+
+\begin{itemize}[leftmargin=*]
+  \item \todo{Cite prior AI incident/agent-monitoring work this builds on
+    (e.g. agent evaluation/red-teaming benchmarks, logging/observability
+    literature, digital forensics evidence-retention literature, prior work
+    on periodic vs.\ event-driven monitoring in distributed systems more
+    generally).}
+  \item \todo{State plainly what existing benchmarks/evaluations already
+    measure (typically: whether an agent's actions are \emph{detected} or
+    \emph{scored} for harmfulness) and what they do \emph{not} measure
+    (whether the evidence needed to investigate an action \emph{survives}
+    under realistic storage/collection constraints).}
+  \item \textbf{Gap and contribution (draft, tighten with citations):} to our
+    knowledge, no existing AI incident-response evaluation treats evidence
+    \emph{retention under a capacity-constrained monitor} as the primary
+    outcome variable, or builds an adversarial ``hostile control'' suite
+    specifically to stress-test the fairness of a monitoring-policy
+    comparison. \todo{soften/qualify this claim once related work is actually
+    checked -- an unverified novelty claim is exactly what loses
+    Impact/Innovation points with judges.}
+\end{itemize}
+
+% ==========================================================================
+\section{Methodology}
+% ==========================================================================
+% Required: enough detail to replicate -- methods, experimental design, data,
+% sources, assumptions, evaluation procedure. This project's own docs already
+% contain nearly all of this in verified form; the bullets below cite exactly
+% where. Turn into prose; keep the specific numbers, drop anything not needed
+% for replication understanding at report length.
+
+\subsection{Environment and data}
+\begin{itemize}[leftmargin=*]
+  \item Trace-grounded simulation over a released wiki-style corpus (``DSE'')
+    of autonomous-agent edits: \todo{state corpus size --- 13{,}403+ revisions
+    per \texttt{docs/PRE\_RESULTS\_CLOSURE.md}; confirm exact final count} across
+    a fixed replay window (\texttt{2026-05-24} to \texttt{2026-07-15}).
+  \item Study description (use verbatim or close paraphrase --- this exact
+    framing was deliberately frozen as the paper's own epistemic-status
+    statement, per \texttt{docs/X13\_RUN\_CONTRACT.md}): \emph{``Trace-grounded,
+    live-only simulation under a shared hypothetical change-feed interface,
+    conditional on the released DSE history. Evidence not retained by a
+    simulated collector is not evidence permanently erased from the
+    website.''}
+\end{itemize}
+
+\subsection{Benchmark}
+\begin{itemize}[leftmargin=*]
+  \item 65 hand-labeled propositions (concrete claims that an agent did
+    something), 57 critical / 8 non-critical; split 38 development / 27
+    held-out, 34/23 critical respectively. Primary held-out critical
+    denominator $K = 23$.
+  \item 25 title-groups, 52 catalog pages including context dependencies;
+    1{,}421 core occurrence (span-provenance) rows across the corpus.
+  \item 8 of 65 propositions require additional \emph{context} (a prior
+    revision or a deletion event) beyond their own anchor span to be
+    meaningful; all 8 have frozen, groundable context alternatives (57 are
+    self-contained). One proposition
+    (\texttt{PROP-20260616-61}) required adjudicating a genuine three-way
+    ambiguity (three near-identical candidate ``older helper pages''
+    matching a referenced query pattern) rather than forcing a single
+    choice --- resolved as an OR across all three valid alternatives.
+  \item Every quotation, span, and hash in the benchmark is independently
+    re-derivable from the raw export by construction (SHA-256 over the
+    reconstructed source bytes, exact half-open character spans).
+  \item \textbf{Novelty/replication note worth including:} the annotation
+    process itself was adversarially audited across the team multiple times;
+    concrete, disclosed corrections found along the way included a stale
+    benchmark count in an early spec, an encoding bug that silently mismatched
+    2 evidence rows and 80 occurrence rows against their true source bytes
+    (traced to an unconditional Latin-1 byte-projection requirement in the
+    raw export, not a declared-encoding branch), and a first-pass context
+    axis that could initially count context without core. \todo{decide how
+    much of this process detail belongs in the main report vs.\ an appendix
+    --- it supports Execution Quality but can bloat the 8-page limit.}
+\end{itemize}
+
+\subsection{Collection policies compared}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Periodic:} fixed-interval polling at several intervals
+    $\Delta$ (P, PD, PCD variants), evaluated across all 60 phase offsets
+    within each interval (not a single arbitrarily-chosen phase).
+  \item \textbf{Event-driven (E):} feed-triggered collection, rate-limited by
+    a token-bucket parameter $q$.
+  \item \textbf{Primary contrast (frozen before any result was seen):} PCD at
+    $\Delta=15$ minutes (mean across all 60 phases) vs.\ E at $q=30$; shared
+    1\,MiB capped, deduplicated store; 5s feed lag; 60s poll interval; 0s GET
+    delay. Decision rule: a $\geq 10$ percentage-point difference in held-out
+    critical core retention at the study endpoint.
+  \item \textbf{Hostile controls,} run to test whether the primary contrast
+    is a fair/robust comparison rather than an artifact of policy choice:
+  \begin{itemize}
+    \item \emph{F} --- a low-information baseline: one terminal-state
+      directory listing plus one atomic GET per currently-live title, no
+      ongoing polling at all.
+    \item \emph{PCD-R} --- an online self-repair variant of periodic
+      collection that opportunistically re-fetches known-stale content,
+      including under non-zero response delay with a real pending-request
+      model (a request already in flight for a title suppresses a duplicate
+      repair attempt for that same title).
+    \item \emph{Reverse-order} stress --- services titles/events in reversed
+      order at each sweep, to test whether the comparison is sensitive to
+      arbitrary service ordering under storage pressure.
+    \item \emph{Terminal archive augmentation} --- a full enumeration of every
+      revision saved by the study endpoint, layered on top of the live
+      collection, to bound how much a terminal archival pass alone recovers.
+  \end{itemize}
+\end{itemize}
+
+\subsection{Evaluator and causal-ordering model}
+\begin{itemize}[leftmargin=*]
+  \item The evaluator scores \emph{only} what a policy's own capped,
+    deduplicated store actually retained at the study checkpoint --- never a
+    collector's full diagnostic/rejected-body history. A proposition counts
+    as covered only if a complete, exactly-hashed, exactly-spanned frozen
+    occurrence is present in the retained snapshot at that checkpoint (OR
+    across independently sufficient alternatives, AND within a multi-span
+    alternative).
+  \item \textbf{Causal-ordering guarantee (worth stating as a concrete,
+    testable property, not just an assumption):} a single monotonic
+    operation clock governs feed polls, GET dispatch, and completions; an
+    as-of-checkpoint cost/coverage query computed from a full run is required
+    to exactly equal the same query computed by truncating the run to a
+    fresh prefix ending at that checkpoint. This was verified, not assumed
+    (independently constructed adversarial histories, not just the
+    project's own unit tests).
+  \item Unknown/unavailable required context is retained as an explicit
+    interval (lower/upper bound), never coerced to a zero or a point
+    estimate.
+  \item \todo{once real numbers exist: state exact software/commit identity
+    used for the reported run (git commit hash, frozen manifest hash) so the
+    result is exactly reproducible.}
+\end{itemize}
+
+\subsection{Independent verification process}
+\begin{itemize}[leftmargin=*]
+  \item Every methodological/engineering component passed through an
+    explicit two-gate process before any real scoring was authorized: an
+    engineering-readiness gate, then a comprehensive independent audit gate
+    (adversarial, hand-derived expected values written down \emph{before}
+    executing code, on fixtures the auditor constructed independently rather
+    than reusing the implementer's own test fixtures).
+  \item \todo{state final gate outcome plainly once locked for submission:
+    both gates passed as of this draft; no real scoring has occurred yet.}
+  \item This process caught and fixed concrete implementation bugs before
+    any result existed, e.g.\ a data-integrity check that failed open (raised
+    an untyped error rather than a specific, catchable integrity violation)
+    on a corrupted retained-body reference, and a real-mode cost/overhead
+    reporting gap where several required per-row measurements were never
+    populated. \todo{decide exact phrasing/level of detail for the report ---
+    this is genuine Execution Quality evidence but should be summarized, not
+    itemized at full length.}
+\end{itemize}
+
+% ==========================================================================
+\section{Results}
+% ==========================================================================
+\pending{This entire section. X13 (the actual 791-configuration experiment)
+has not been executed as of this draft. Do not fill in numbers here until a
+real, authorized run has actually completed. Below is the exact shape the
+results section will take once it has.}
+
+\subsection{Primary result}
+\begin{itemize}[leftmargin=*]
+  \item \pending{Held-out critical core retention: PCD15 (mean of 60 phases)
+    vs.\ E30, percentage-point difference, and which side of the frozen
+    $\geq 10$pp threshold it falls on.}
+  \item \pending{Table: per-phase PCD15 retention distribution (all 60
+    phases: min/median/mean/p10/p90) vs.\ single E30 value.}
+\end{itemize}
+
+\subsection{Sensitivity / hostile-control results}
+\begin{itemize}[leftmargin=*]
+  \item \pending{F baseline retention (lower bound / sanity floor).}
+  \item \pending{PCD-R vs.\ plain PCD --- does online repair close any gap?}
+  \item \pending{Reverse-order stress --- does service order change the
+    outcome materially?}
+  \item \pending{Archive augmentation --- how much does a terminal archival
+    pass alone recover, live-only vs.\ archive-augmented?}
+  \item \pending{Cost/overhead comparison table --- requests, bytes,
+    byte-hours, wall-clock/CPU/RSS --- at matched access, per the frozen
+    accounting contract.}
+\end{itemize}
+
+\subsection{Main threat to validity}
+\begin{itemize}[leftmargin=*]
+  \item \todo{fill in honestly once results exist --- candidates already
+    identified during methodology design: (a) benchmark is 65
+    hand-adjudicated items, not a large statistical sample; (b) simulated
+    environment, not live production telemetry; (c) sampling/episode
+    provenance for the underlying corpus is not independently certified as
+    representative (explicitly flagged during the project's own audit).}
+\end{itemize}
+
+% ==========================================================================
+\section{Discussion}
+% ==========================================================================
+\begin{itemize}[leftmargin=*]
+  \item \todo{What the result implies for monitoring-policy design in AI
+    incident response, once it exists --- write this only after Results is
+    real; do not pre-write a conclusion.}
+  \item \textbf{Practical implication regardless of which way the result
+    goes (safe to write now):} the benchmark, evaluator, and hostile-control
+    suite are themselves reusable artifacts for testing any future monitoring
+    policy against the same frozen evidence-retention question, on this or
+    an extended corpus.
+  \item \todo{Future work: e.g.\ broader capacity-cap sweep (explicitly
+    scoped out of this run as \texttt{NOT\_EXECUTED\_SCOPE\_AMENDMENT}), real
+    (non-simulated) agent telemetry, additional collection policies.}
+\end{itemize}
+
+% ==========================================================================
+\section*{Acknowledgment of AI Tool Use}
+% ==========================================================================
+% The sprint explicitly requires disclosure of what was built on / what AI
+% assistance was used for, distinct from "did AI write the report." Be
+% specific and honest here -- this protects the team, it does not hurt the
+% Impact/Innovation score.
+\todo{State specifically: which AI tools were used, for what (e.g.\ code
+implementation assistance, independent adversarial code review, debugging),
+and confirm this report's prose was written by the team, with AI used only
+to check reasoning/find gaps, per the sprint's own stated policy on AI tool
+use in \texttt{docs/Hackathon\_Judging\_Submission\_Requirements.md}.}
+
+% ==========================================================================
+\appendix
+\section{Limitations and Dual-Use Considerations}
+% ==========================================================================
+% REQUIRED APPENDIX. Do not omit. Write in full sentences; bullets below are
+% starting points only, drawn from things already explicitly disclosed
+% during this project's own audit trail (cite the internal doc each time so
+% every claim has a source, per the sprint's evidence-based-claims rule).
+
+\subsection*{Limitations}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Simulated environment, not production telemetry.} All agent
+    behavior is drawn from a released simulated wiki trace, not real deployed
+    AI agents; findings characterize retention dynamics under this
+    trace-and-model, not a general claim about production monitoring
+    systems.
+  \item \textbf{Benchmark scale and provenance.} 65 hand-adjudicated
+    propositions is not a large statistical sample; the underlying corpus's
+    sampling/episode provenance is explicitly not certified as a
+    representative, exhaustively-validated incident population (a
+    limitation the team identified and disclosed during its own
+    methodology audit, not one an external reviewer found).
+  \item \textbf{Scope amendment.} A originally-larger experimental matrix was
+    narrowed under time constraints (e.g.\ a broader storage-cap sweep and
+    several secondary cross-products were explicitly descoped rather than
+    silently dropped); every omission is logged with an explicit reason
+    rather than presented as completed work. \todo{state exact omitted items
+    if space allows, or reference the scope-amendment record.}
+  \item \textbf{No claim of real-world permanent erasure.} A body missing
+    from a simulated collector's retained store is not equivalent to
+    evidence being permanently destroyed on the real underlying
+    system --- only that this particular simulated monitor did not retain
+    it.
+  \item \textbf{No claim about agent intent.} Wiki actor handles in the
+    corpus are labels, not independently verified distinct agent identities
+    or confirmed intentional evasion; behavioral patterns that look like
+    evasion (e.g.\ backup-page creation before a deletion) are reported as
+    observed sequences of actions, not as proven intent.
+  \item \textbf{No general superiority claim.} Any observed advantage for
+    event-driven or periodic collection in this study is scoped to the
+    tested cap, rate, and interval settings and must not be read as a
+    general claim that one architecture dominates the other across all
+    monitoring settings or domains.
+\end{itemize}
+
+\subsection*{Dual-Use Considerations}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Defensive framing.} This work is intended to inform
+    \emph{defensive} monitoring/observability design for AI incident
+    response (i.e.\ helping defenders retain the evidence they need).
+  \item \textbf{Potential misuse vector.} The same evidence-retention
+    analysis could in principle be used by an adversarial actor to identify
+    which monitoring configurations retain the \emph{least} evidence of a
+    given behavior, i.e.\ to time or structure actions to evade a specific
+    monitoring cadence. \todo{state directly whether/why the team judges the
+    defensive value to outweigh this risk, and whether any specific
+    technique in the repository (e.g.\ exact evasion-timing parameters) was
+    withheld from public release for this reason.}
+  \item \textbf{No exploit code released.} \todo{confirm and state whether
+    the public repository (if published) omits anything that would function
+    as a ready-made evasion-timing recipe against a real monitoring system.}
+\end{itemize}
+
+% ==========================================================================
+\section*{References}
+% ==========================================================================
+% \todo Replace with real citations (related work, any external methodology
+% referenced). A plain bibliography is used here instead of BibTeX/biblatex
+% to keep this template dependency-free; swap in \bibliography{refs} if the
+% team prefers a .bib file.
+
+\begin{thebibliography}{9}
+\bibitem{todo1} \todo{Author, ``Title,'' Venue, Year.}
+\bibitem{todo2} \todo{Author, ``Title,'' Venue, Year.}
+\end{thebibliography}
+
+\end{document}
