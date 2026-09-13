@@ -287,3 +287,22 @@ X13 plot, or favorable parameter selection was generated.
 
 **Exact next owner: Sam — final comprehensive Gate 2 re-audit and authorization
 decision.**
+
+## 2026-09-13 performance-repair addendum
+
+The later authorized ordinal-1 attempt timed out after 7,200 seconds without a
+row artifact or scientific result. Outcome-blind profiling found repeated
+nominal reconstruction, redundant hashing/serialization, and massive per-request
+diagnostic/accounting retention. Exact interval/content caches and an explicit
+runner-only compact P/PD/PCD path pass the equivalence harness for P, PD, PCD,
+PCD-R, and E.
+
+The repair is nevertheless **PERFORMANCE REPAIR INSUFFICIENT** for all 791 rows.
+Ordinal 1 remained incomplete at a bounded one-hour post-repair diagnostic, and
+the 240 high-request P/PD rows require 1.551 billion modeled attempts. The old
+manifest and authorization are not reused: the checked-in manifest deliberately
+still binds the prior code state, so two identity tests fail closed pending a
+versioned decision. No evidence result was inspected.
+
+**Exact next owner: Jaswin/Astra — outcome-blind runtime-only X13 scope
+amendment.**
