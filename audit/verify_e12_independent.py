@@ -27,6 +27,17 @@ from ebe.storage import Capture, CaptureStore  # noqa: E402
 FAILURES: list[str] = []
 
 
+def _h(body: bytes) -> str:
+    """Real SHA-256 of a fixture body. Ubayd's fail-closed retained-snapshot
+    validation (src/ebe/evaluator.py:validate_snapshot, added in bbdc885)
+    correctly rejects a RetainedBodyRecord whose body_sha256 doesn't match its
+    own bytes -- the placeholder strings ("h", "h2", ...) this script
+    originally used only worked because that validation didn't exist yet.
+    This is not an E12 bug; it's this script's own fixtures needing a real
+    hash now that the boundary they exist to test is actually enforced."""
+    return hashlib.sha256(body).hexdigest()
+
+
 def check(label: str, cond: bool, detail: str = "") -> None:
     status = "PASS" if cond else "FAIL"
     print(f"  {status} {label}" + (f" -- {detail}" if detail and not cond else ""))
@@ -45,7 +56,8 @@ def M(minutes: int) -> datetime:
 print("=== Hand-scored cases A-K (expected values fixed before any evaluator call) ===")
 
 # --- Case A: one proposition, one exact retained span. Expected: covered=1, denom=1. ---
-snap_a = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~A", M(1), b"the exact required span", "h"),), ())
+_body_a = b"the exact required span"
+snap_a = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~A", M(1), _body_a, _h(_body_a)),), ())
 frag_a = {"f1": Fragment("f1", "dse~A", "body_span", required_substring=b"exact required span")}
 prop_a = Proposition("CASE-A", True, (("f1",),))
 res_a = compute_core_coverage([prop_a], frag_a, snap_a, critical_only=False)
@@ -53,7 +65,8 @@ check("Case A: numerator=1, denominator=1", (res_a.numerator, res_a.denominator)
 
 # --- Case B: two valid alternative occurrences; original lost (not in snapshot), second retained.
 # Expected: covered ONCE (numerator=1), not twice, and not zero.
-snap_b = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~B", M(5), b"second occurrence text", "h2"),), ())
+_body_b = b"second occurrence text"
+snap_b = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~B", M(5), _body_b, _h(_body_b)),), ())
 frag_b = {
     "alt1-f1": Fragment("alt1-f1", "dse~B", "body_span", required_substring=b"original occurrence text (never retained)"),
     "alt2-f1": Fragment("alt2-f1", "dse~B", "body_span", required_substring=b"second occurrence text"),
@@ -63,7 +76,8 @@ res_b = compute_core_coverage([prop_b], frag_b, snap_b, critical_only=False)
 check("Case B: covered once via the surviving alternative (numerator=1)", res_b.numerator == 1, str(res_b.numerator))
 
 # --- Case C: multi-span proposition, only ONE of two required spans retained. Expected: uncovered (numerator=0). ---
-snap_c = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~C", M(1), b"span one present but span two missing entirely", "h3"),), ())
+_body_c = b"span one present but span two missing entirely"
+snap_c = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~C", M(1), _body_c, _h(_body_c)),), ())
 frag_c = {
     "f1": Fragment("f1", "dse~C", "body_span", required_substring=b"span one present"),
     "f2": Fragment("f2", "dse~C", "body_span", required_substring=b"span two REQUIRED BUT ABSENT"),
@@ -73,7 +87,8 @@ res_c = compute_core_coverage([prop_c], frag_c, snap_c, critical_only=False)
 check("Case C: uncovered, one of two required spans missing (numerator=0)", res_c.numerator == 0, str(res_c.numerator))
 
 # --- Case D: multi-span proposition, ALL spans retained. Expected: covered (numerator=1). ---
-snap_d = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~D", M(1), b"span one present AND span two present too", "h4"),), ())
+_body_d = b"span one present AND span two present too"
+snap_d = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~D", M(1), _body_d, _h(_body_d)),), ())
 frag_d = {
     "f1": Fragment("f1", "dse~D", "body_span", required_substring=b"span one present"),
     "f2": Fragment("f2", "dse~D", "body_span", required_substring=b"span two present too"),
@@ -84,9 +99,9 @@ check("Case D: covered, all required spans present (numerator=1)", res_d.numerat
 
 # --- Case E: same proposition satisfied by THREE cumulative retained copies. Expected: numerator increases ONCE (1, not 3). ---
 snap_e = RetainedSnapshot(M(10), (
-    RetainedBodyRecord("dse~E", M(1), b"persisting header text", "h5a"),
-    RetainedBodyRecord("dse~E", M(3), b"persisting header text", "h5b"),
-    RetainedBodyRecord("dse~E", M(5), b"persisting header text", "h5c"),
+    RetainedBodyRecord("dse~E", M(1), _body_e := b"persisting header text", _h(_body_e)),
+    RetainedBodyRecord("dse~E", M(3), _body_e, _h(_body_e)),
+    RetainedBodyRecord("dse~E", M(5), _body_e, _h(_body_e)),
 ), ())
 frag_e = {"f1": Fragment("f1", "dse~E", "body_span", required_substring=b"persisting header text")}
 prop_e = Proposition("CASE-E", True, (("f1",),))
@@ -94,7 +109,8 @@ res_e = compute_core_coverage([prop_e], frag_e, snap_e, critical_only=False)
 check("Case E: three cumulative copies still count as ONE covered unit (numerator=1, not 3)", res_e.numerator == 1, str(res_e.numerator))
 
 # --- Case F: critical + noncritical propositions. Expected: critical_only=True denominator=1 (only CASE-F-CRIT), not 2. ---
-snap_f = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~F", M(1), b"crit content", "h6"),), ())
+_body_f = b"crit content"
+snap_f = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~F", M(1), _body_f, _h(_body_f)),), ())
 frag_f = {"f1": Fragment("f1", "dse~F", "body_span", required_substring=b"crit content")}
 prop_f_crit = Proposition("CASE-F-CRIT", True, (("f1",),))
 prop_f_noncrit = Proposition("CASE-F-NONCRIT", False, (("f1",),))
@@ -104,7 +120,8 @@ check("Case F: critical_only=False denominator=2 (both units)", res_f_all.denomi
 check("Case F: critical_only=True denominator=1 (only the critical unit)", res_f_crit.denominator == 1, str(res_f_crit.denominator))
 
 # --- Case G: ineligible proposition. Expected: excluded from BOTH numerator and denominator, appears only in excluded_ids. ---
-snap_g = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~G", M(1), b"would-be-covered content", "h7"),), ())
+_body_g = b"would-be-covered content"
+snap_g = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~G", M(1), _body_g, _h(_body_g)),), ())
 frag_g = {"f1": Fragment("f1", "dse~G", "body_span", required_substring=b"would-be-covered content")}
 prop_g_eligible = Proposition("CASE-G-ELIGIBLE", True, (("f1",),))
 prop_g_ineligible = Proposition("CASE-G-INELIGIBLE", True, (("f1",),), eligible=False, eligibility_reason="test exclusion")
@@ -200,8 +217,8 @@ check("Case I: diagnostic-only content produces NO coverage (numerator=0)", res_
 # --- Case J: delay with two alternative supports at different times. Expected: uses the EARLIEST
 # completed alternative (M(2)), not the later one (M(8)), and delay = M(2) - earliest_eligible_support.
 snap_j = RetainedSnapshot(M(10), (
-    RetainedBodyRecord("dse~J", M(8), b"later alternative content", "hj1"),
-    RetainedBodyRecord("dse~J", M(2), b"earlier alternative content", "hj2"),
+    RetainedBodyRecord("dse~J", M(8), _body_j_late := b"later alternative content", _h(_body_j_late)),
+    RetainedBodyRecord("dse~J", M(2), _body_j_early := b"earlier alternative content", _h(_body_j_early)),
 ), ())
 frag_j = {
     "alt-early": Fragment("alt-early", "dse~J", "body_span", required_substring=b"earlier alternative content"),
@@ -215,7 +232,8 @@ check("Case J: delay uses the earliest completed alternative (120.0s), not the l
 check("Case J: status is 'retained'", res_j.status == "retained", res_j.status)
 
 # --- Case K: context not frozen. Expected: explicit NOT_FROZEN status, NOT a fabricated 0%. ---
-snap_k = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~K", M(1), b"core content", "hk"),), ())
+_body_k = b"core content"
+snap_k = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~K", M(1), _body_k, _h(_body_k)),), ())
 frag_k = {"f1": Fragment("f1", "dse~K", "body_span", required_substring=b"core content")}
 prop_k = Proposition("CASE-K", True, (("f1",),), context_alternatives=())  # no context modeled
 res_k = compute_context_coverage([prop_k], frag_k, snap_k, critical_only=False)
@@ -229,17 +247,30 @@ for f in FAILURES:
 
 # ===========================================================================
 print("\n=== Section 2: retained-snapshot integrity boundary ===")
+# Ubayd's bbdc885 added evaluator.validate_snapshot, called from every
+# coverage/delay entry point -- these two cases previously demonstrated a
+# silent-acceptance gap (numerator=1 when it should be rejected). Re-verify
+# independently: the correct current behavior is that BOTH now raise
+# SnapshotIntegrityError, not merely "numerator=0".
+from ebe.evaluator import SnapshotIntegrityError  # noqa: E402
+
 tampered = RetainedBodyRecord("dse~TX", M(1), b"REAL CONTENT", "BADHASH_DOES_NOT_MATCH_BODY")
 snap_tx = RetainedSnapshot(M(10), (tampered,), ())
 frag_tx = {"f1": Fragment("f1", "dse~TX", "body_span", required_substring=b"REAL CONTENT")}
-res_tx = compute_core_coverage([Proposition("TX", True, (("f1",),))], frag_tx, snap_tx, critical_only=False)
-check("BOUNDARY GAP: a body whose body_sha256 does NOT match its own bytes is silently accepted as covered (expected: rejected, found: not validated at all)", res_tx.numerator == 0, f"numerator={res_tx.numerator} (evaluator never recomputes/validates body_sha256)")
+try:
+    compute_core_coverage([Proposition("TX", True, (("f1",),))], frag_tx, snap_tx, critical_only=False)
+    check("FIXED: a body whose body_sha256 does NOT match its own bytes is now rejected (raises SnapshotIntegrityError)", False, "no exception raised -- still silently accepted")
+except SnapshotIntegrityError:
+    check("FIXED: a body whose body_sha256 does NOT match its own bytes is now rejected (raises SnapshotIntegrityError)", True)
 
-post_ck = RetainedBodyRecord("dse~TY", M(10) + timedelta(hours=1), b"FUTURE CONTENT", "irrelevant")
+post_ck = RetainedBodyRecord("dse~TY", M(10) + timedelta(hours=1), b"FUTURE CONTENT", _h(b"FUTURE CONTENT"))
 snap_ty = RetainedSnapshot(M(10), (post_ck,), ())
 frag_ty = {"f1": Fragment("f1", "dse~TY", "body_span", required_substring=b"FUTURE CONTENT")}
-res_ty = compute_core_coverage([Proposition("TY", True, (("f1",),))], frag_ty, snap_ty, critical_only=False)
-check("BOUNDARY GAP: a RetainedBodyRecord with capture_time AFTER the snapshot's own checkpoint is silently counted (expected: rejected, found: no checkpoint-time validation at all)", res_ty.numerator == 0, f"numerator={res_ty.numerator} (evaluator never checks capture_time <= snapshot.checkpoint)")
+try:
+    compute_core_coverage([Proposition("TY", True, (("f1",),))], frag_ty, snap_ty, critical_only=False)
+    check("FIXED: a RetainedBodyRecord with capture_time AFTER the snapshot's own checkpoint is now rejected (raises SnapshotIntegrityError)", False, "no exception raised -- still silently counted")
+except SnapshotIntegrityError:
+    check("FIXED: a RetainedBodyRecord with capture_time AFTER the snapshot's own checkpoint is now rejected (raises SnapshotIntegrityError)", True)
 
 # ===========================================================================
 print("\n=== Section 3: A05 population firewall corruption attempts ===")
@@ -262,11 +293,11 @@ _fw_check("duplicate evidence ID is rejected", lambda: validate_population(
 _fw_check("dangling fragment reference is rejected", lambda: validate_population(
     [Proposition("DANGLE", True, (("missing",),))], {}))
 
-_fw_check("FIREWALL GAP: a fragment referencing a page OUTSIDE the dse~ universe (e.g. a foreign wiki's page_key) should be rejected -- no DSE-universe check exists in validate_population at all", lambda: validate_population(
+_fw_check("FIXED: a fragment referencing a page OUTSIDE the dse~ universe (e.g. a foreign wiki's page_key) is now rejected", lambda: validate_population(
     [Proposition("OFFSITE", True, (("f-off",),))],
     {"f-off": Fragment("f-off", "notdse~SomePage", "body_span", required_substring=b"x")}))
 
-_fw_check("FIREWALL GAP: a critical proposition whose ENTIRE core support is a single observable_feed fragment (no body_span at all) should be rejected -- X13_RUN_CONTRACT.md SS4 requires every core alternative of a body-grounded unit to require at least one body fragment", lambda: validate_population(
+_fw_check("FIXED: a critical proposition whose ENTIRE core support is a single observable_feed fragment (no body_span at all) is now rejected", lambda: validate_population(
     [Proposition("FEEDONLY", True, (("feed-f",),))],
     {"feed-f": Fragment("feed-f", "dse~A", "observable_feed", feed_action="live_change")}))
 
@@ -275,10 +306,10 @@ print("\n=== Section 4: source-encoding custody (independent of the loader's own
 # E05's raw `body` field is a Latin-1 BYTE PROJECTION regardless of the declared
 # body_encoding -- every byte of the true source was mapped 1:1 to one Python
 # character. To recover the true source bytes you must ALWAYS body.encode("latin-1"),
-# never branch on body_encoding. The real loader (src/ebe/a11_loader.py) branches on
-# body_encoding instead, matching a pre-existing bug in the annotation pipeline's own
-# recorded hashes -- so the loader's own OCCURRENCE_BODY_HASH_MISMATCH check silently
-# validates against the WRONG derivation, rather than catching the real one.
+# never branch on body_encoding. src/ebe/a11_loader.py's `_raw_body_bytes` (added in
+# 266f3b3, after this review first reported the gap) now does this unconditionally --
+# the check below now independently confirms the loader catches it, rather than
+# demonstrating that it doesn't.
 import json as _json  # noqa: E402
 _revs = {}
 with open(REPO / "data" / "raw" / "export" / "revisions.jsonl", encoding="utf-8") as f:
@@ -302,7 +333,38 @@ check("ENCODING BUG: occurrences.jsonl body_sha256 matches the TRUE source bytes
 
 from ebe.a11_loader import load_a11_benchmark  # noqa: E402
 _bm = load_a11_benchmark(fail_on_error=False)
-check("The real loader's own hash check independently catches this same encoding bug (it currently does not -- it shares the same body_encoding-branch logic)", not _bm.validation.valid and any("HASH" in i.code for i in _bm.validation.issues), f"loader reports valid={_bm.validation.valid}, {len(_bm.validation.issues)} issues -- the loader's own check silently passes the same corrupted hashes")
+_independent_hash_defect = bool(_ev_mismatches) or bool(_occ_mismatches)
+_loader_reports_hash_issue = any("HASH" in i.code for i in _bm.validation.issues)
+print(f"  INFO loader issue breakdown: {dict(__import__('collections').Counter(i.code for i in _bm.validation.issues))}")
+check(
+    "the real loader's own hash check agrees with this script's independent from-scratch recomputation "
+    "(both clean, or both catching the same defect -- not asserting which state is 'correct')",
+    _loader_reports_hash_issue == _independent_hash_defect,
+    f"independent recomputation found a defect={_independent_hash_defect}, loader reports a HASH issue={_loader_reports_hash_issue}",
+)
+if _independent_hash_defect:
+    print("  INFO a source-encoding hash defect is present in the frozen annotation files (per this script's own")
+    print("       independent recomputation, not the loader's report) -- this is the annotation-layer blocker; a fix")
+    print("       requires the annotation team to correct evidence.jsonl/occurrences.jsonl, not this script or E12 code.")
+try:
+    load_a11_benchmark()
+    _default_raised = False
+except DenominatorFirewallError:
+    _default_raised = True
+check(
+    "load_a11_benchmark(fail_on_error=True) (the real default) raises iff this script's own independent "
+    "recomputation found a real hash defect (not asserting the annotation layer's state either way)",
+    _default_raised == _independent_hash_defect,
+    f"independent defect found={_independent_hash_defect}, default loader raised={_default_raised}",
+)
+if not _independent_hash_defect:
+    print("  INFO independently confirmed (fresh sha256(body.encode('latin-1')) recomputation against evidence.jsonl/")
+    print("       occurrences.jsonl's own recorded hashes, not trusting the loader or any PASS report): the source-")
+    print("       encoding hash provenance defect this review originally found (2 evidence + 80 occurrence rows) is no")
+    print("       longer present. This confirms only the hash/encoding provenance repair -- it is NOT a rerun of the")
+    print("       full E12 independent acceptance review (pilot leakage, PROP-20260618-63 eligibility, epistemic-leakage")
+    print("       prose, split isolation, context/delay sections were not re-checked here) and does not by itself amend")
+    print("       audit/E12_INDEPENDENT_ACCEPTANCE.md's CONDITIONAL PASS verdict.")
 
 print("\n" + "=" * 60)
 print(f"FINAL GRAND TOTAL FAILURES: {len(FAILURES)}")
