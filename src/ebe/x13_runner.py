@@ -5,12 +5,14 @@ import csv
 import hashlib
 import json
 import os
+import sys
 import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Literal
 
 from .x13_manifest import AMENDMENT, RUN_ROOT_NAME, canonical_json, sha256_file, validate_manifest
+from .accounting import synchronized_accounting
 
 RunStatus = Literal["PLANNED", "RUNNING", "COMPLETE", "ERROR", "MISSING", "NOT_EVALUABLE"]
 LOGICAL_RESULT_FIELDS = (
@@ -37,6 +39,55 @@ class AuthorizationError(RunnerError): pass
 class ResumeMismatchError(RunnerError): pass
 
 
+NA_NOT_APPLICABLE = "NA_NOT_APPLICABLE"
+NA_NOT_REUSED = "NA_NOT_REUSED"
+NA_NOT_SEPARATELY_MEASURABLE = "NA_NOT_SEPARATELY_MEASURABLE_IN_PROCESS"
+NA_PENDING_ARTIFACT = "NA_PENDING_ARTIFACT_MATERIALIZATION"
+
+
+def _rss_bytes() -> int | str:
+    """Best-effort process RSS using only platform/runtime facilities."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            class Counters(ctypes.Structure):
+                _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t), ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t), ("PeakPagefileUsage", ctypes.c_size_t)]
+            counters = Counters(); counters.cb = ctypes.sizeof(counters)
+            process = ctypes.windll.kernel32.GetCurrentProcess()
+            if ctypes.windll.psapi.GetProcessMemoryInfo(
+                    process, ctypes.byref(counters), counters.cb):
+                return int(counters.WorkingSetSize)
+        except (AttributeError, OSError, ValueError):
+            pass
+    else:
+        try:
+            import resource
+            value = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+            return value if sys.platform == "darwin" else value * 1024
+        except (ImportError, OSError, ValueError):
+            pass
+    return "NA_RSS_UNAVAILABLE_ON_PLATFORM"
+
+
+def _combined_points(s_points, m_points):
+    """Merge timestamped step ledgers; metadata changes precede store changes."""
+    tagged = ([(when, 0, index, "m", value) for index, (when, value) in enumerate(m_points)]
+              + [(when, 1, index, "s", value) for index, (when, value) in enumerate(s_points)])
+    s = m = 0; points = []
+    for when, _, _, kind, value in sorted(tagged, key=lambda item: item[:3]):
+        if kind == "s": s = value
+        else: m = value
+        points.append((when, s, m))
+    return points
+
+
 @dataclass(frozen=True, slots=True)
 class RunOutcome:
     status: RunStatus
@@ -55,6 +106,23 @@ def _atomic(path: Path, payload: bytes) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_bytes(payload)
     os.replace(temporary, path)
+
+
+def _serialize_with_artifact_size(result: dict[str, Any]) -> bytes:
+    """Serialize a row whose disk-size field describes the exact JSON bytes."""
+    artifact_size = 0
+    for _ in range(4):
+        result["result"]["artifact_disk_bytes"] = artifact_size
+        payload = canonical_json(result) + b"\n"
+        next_size = len(payload)
+        if next_size == artifact_size:
+            return payload
+        artifact_size = next_size
+    result["result"]["artifact_disk_bytes"] = artifact_size
+    payload = canonical_json(result) + b"\n"
+    if result["result"]["artifact_disk_bytes"] != len(payload):
+        raise RunnerError("artifact-size serialization did not converge")
+    return payload
 
 
 def _authorization(repo: Path, manifest_sha: str, artifact: Path | None) -> None:
@@ -77,6 +145,25 @@ def synthetic_executor(row: dict[str, Any]) -> RunOutcome:
                "retained_bytes": seed % 1_048_577, "coverage_numerator": seed % 24,
                "coverage_denominator": 23, "elapsed_seconds": None, "rss_bytes": None,
                "total_attempts": 1 + seed % 100, "unsupported": 0})
+    payload.update({
+        "synchronized_peak_s_plus_m": "NA_SYNTHETIC_NO_ACCOUNTING_LEDGER",
+        "combined_byte_microseconds": "NA_SYNTHETIC_NO_ACCOUNTING_LEDGER",
+        "elapsed_seconds": "NA_SYNTHETIC_NOT_TIMED",
+        "cpu_seconds": "NA_SYNTHETIC_NOT_TIMED",
+        "rss_bytes": "NA_SYNTHETIC_NOT_MEASURED",
+        "artifact_disk_bytes": NA_PENDING_ARTIFACT,
+        "aux_collector_bytes": "NA_SYNTHETIC_NO_COLLECTOR",
+        "aux_store_bytes": "NA_SYNTHETIC_NO_STORE",
+        "aux_evaluator_bytes": "NA_SYNTHETIC_NO_EVALUATOR",
+        "pending_index_peak": NA_NOT_APPLICABLE,
+        "queue_peak": NA_NOT_APPLICABLE,
+        "coalesced_updates": NA_NOT_APPLICABLE,
+        "starvation_events": NA_NOT_APPLICABLE,
+        "dropped_work": NA_NOT_APPLICABLE,
+        "reused_from": NA_NOT_REUSED,
+        "feed_metadata_bytes": "NA_SYNTHETIC_NO_OBSERVER",
+        "directory_metadata_bytes": "NA_SYNTHETIC_NO_OBSERVER",
+    })
     return RunOutcome("COMPLETE", payload)
 
 
@@ -90,7 +177,7 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
     from .a11_loader import load_a11_benchmark
     from .collectors import (EventDerivedConfig, PeriodicConfig, PeriodicPolicy,
                              run_event_derived, run_periodic)
-    from .evaluator import (RetainedBodyRecord, RetainedFeedRecord, RetainedSnapshot,
+    from .evaluator import (RetainedBodyRecord, RetainedFeedRecord, RetainedObjectRecord, RetainedSnapshot,
                             apply_stable_support_mask, evaluate_benchmark)
     from .ingest import load_export
     from .observer import Observer, ObserverConfig
@@ -115,11 +202,18 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
         feed = () if live_result is None else tuple(
             RetainedFeedRecord(r.page_key, r.action, r.event_time, poll.poll_time)
             for poll in live_result.feed_polls for r in poll.records)
-        return RetainedSnapshot(retained.checkpoint, bodies, feed, retained.capacity_bytes,
+        snapshot = RetainedSnapshot(retained.checkpoint, bodies, feed, retained.capacity_bytes,
                                 retained.retained_packet_bytes, retained.retained_body_bytes,
-                                retained.total_bytes)
+                                retained.total_bytes, retained_objects=tuple(
+                                    RetainedObjectRecord(x.object_id, x.body, x.body_sha256, x.refcount)
+                                    for x in retained.body_objects))
+        from .evaluator import validate_snapshot
+        validate_snapshot(snapshot)
+        return snapshot
 
     def execute(row: dict[str, Any]) -> RunOutcome:
+        wall_started = time.perf_counter()
+        cpu_started = time.process_time()
         cfg = row["config"]
         checkpoint = datetime.fromisoformat(cfg["checkpoint"].replace("Z", "+00:00"))
         observer_cfg = ObserverConfig(cfg["feed_lag_us"], cfg["feed_poll_interval_us"],
@@ -154,6 +248,16 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
         context = evaluate_benchmark(benchmark, snapshot, split="held_out",
                                      metric="context", critical_only=True)
         payload = {name: None for name in LOGICAL_RESULT_FIELDS}
+        na_event = NA_NOT_APPLICABLE
+        s_points = terminal.retained.accounting_points if terminal is not None else result.retained_export.accounting_points
+        if result is not None:
+            m_points = list(result.observer_costs.accounting_points)
+            if terminal is not None:
+                m_points.append((checkpoint, result.observer_costs.final_shared_metadata_bytes
+                                 + terminal.metadata_bytes))
+        else:
+            m_points = [(checkpoint, terminal.metadata_bytes)]
+        combined = synchronized_accounting(_combined_points(s_points, m_points), checkpoint)
         if result is not None:
             oc=result.observer_costs; ss=result.storage_snapshot
             payload.update({"feed_polls":oc.feed_requests,"directories":oc.directory_requests,
@@ -161,7 +265,10 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
                 "body":oc.successful_body_responses,"missing":oc.missing_responses,
                 "unknown":oc.unknown_responses,"body_unknown":oc.body_unknown_responses,
                 "ambiguous":oc.ambiguous_responses,"unsupported":oc.unsupported_responses,
-                "pending":oc.pending_body_requests,"response_header_bytes":oc.downloaded_metadata_bytes,
+                "pending":oc.pending_body_requests,
+                "response_header_bytes":oc.downloaded_metadata_bytes-oc.feed_metadata_bytes-oc.directory_metadata_bytes,
+                "feed_metadata_bytes":oc.feed_metadata_bytes,
+                "directory_metadata_bytes":oc.directory_metadata_bytes,
                 "known_body_downloaded_bytes":oc.downloaded_known_body_bytes,
                 "known_lower_bound_bytes":oc.known_downloaded_byte_lower_bound,
                 "na_payload_count":oc.unknown_body_byte_attempts,
@@ -184,17 +291,37 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
                 "final_body_bytes":terminal.retained.retained_body_bytes,
                 "final_s_bytes":terminal.retained.total_bytes,
                 "peak_s_bytes":terminal.retained.peak_bytes})
+            if result is None:
+                payload.update({
+                    "feed_metadata_bytes": 0,
+                    "directory_metadata_bytes": terminal.metadata_bytes if policy == "F" else 0,
+                })
+        event_stats = None if result is None else result.event_stats
+        payload.update({
+            "synchronized_peak_s_plus_m": combined.synchronized_peak_s_plus_m,
+            "combined_byte_microseconds": combined.combined_byte_microseconds,
+            "pending_index_peak": result.peak_dirty_titles if event_stats is not None else na_event,
+            "queue_peak": event_stats.max_queue_depth if event_stats is not None else na_event,
+            "coalesced_updates": event_stats.coalesced_updates if event_stats is not None else na_event,
+            "starvation_events": event_stats.token_starved_dispatch_opportunities if event_stats is not None else na_event,
+            "dropped_work": 0 if event_stats is not None else na_event,
+            "reused_from": NA_NOT_REUSED,
+            "aux_collector_bytes": NA_NOT_SEPARATELY_MEASURABLE,
+            "aux_store_bytes": NA_NOT_SEPARATELY_MEASURABLE,
+            "aux_evaluator_bytes": NA_NOT_SEPARATELY_MEASURABLE,
+            "artifact_disk_bytes": NA_PENDING_ARTIFACT,
+        })
         payload.update({"core_numerator":core.numerator,"core_denominator":core.denominator,
                         "context_numerator":context.numerator,
                         "context_denominator":context.denominator,
                         "context_lower_numerator":context.lower_context_numerator,
                         "context_upper_numerator":context.upper_context_numerator})
-        is_primary_stable_family = (
+        stable_family = (
             row["block"] == "L-primary"
             and ((policy == "PCD" and cfg["interval_us"] == 900_000_000)
                  or (policy == "E" and cfg["q"] == 30))
         )
-        if is_primary_stable_family:
+        if stable_family:
             stable_snapshot = replace(snapshot, stable_support_intervals=stable_intervals)
             stable_core = evaluate_benchmark(stable_benchmark, stable_snapshot,
                 split="held_out", metric="core", critical_only=True)
@@ -204,6 +331,11 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
                 "stable_core_denominator":stable_core.denominator,
                 "stable_context_numerator":stable_context.numerator,
                 "stable_context_denominator":stable_context.denominator})
+        payload.update({
+            "elapsed_seconds": time.perf_counter() - wall_started,
+            "cpu_seconds": time.process_time() - cpu_started,
+            "rss_bytes": _rss_bytes(),
+        })
         return RunOutcome("NOT_EVALUABLE" if payload.get("unsupported") else "COMPLETE", payload)
     return execute
 
@@ -265,7 +397,10 @@ def run(repo: Path, *, mode: Literal["synthetic", "real"] = "synthetic",
             result = {"amendment": AMENDMENT, "manifest_sha256": manifest_sha,
                       "mode": mode, "run_id": row["run_id"], "status": outcome.status,
                       "block": row["block"], "config": row["config"], "result": outcome.payload}
-            payload = canonical_json(result) + b"\n"
+            # Artifact size is known only after serialization. Iterate to the
+            # stable decimal width so the persisted value describes this exact
+            # row JSON artifact (the checksum sidecar is a separate artifact).
+            payload = _serialize_with_artifact_size(result)
             target = run_root / ("synthetic_rows" if mode == "synthetic" else "rows") / f"{row['run_id']}.json"
             _atomic(target, payload)
             checksum = hashlib.sha256(payload).hexdigest()

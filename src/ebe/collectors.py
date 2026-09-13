@@ -335,32 +335,77 @@ class PeriodicCollector:
         )
 
     def _run_repair(self) -> CollectorResult:
-        """Frozen online PCD-R control (the R block uses zero response delay)."""
+        """Frozen online PCD-R control, including synthetic delayed completions."""
         config = self.config
-        if self.observer.config.get_response_delay_us != 0:
-            raise CollectorError("PCD-R delayed scheduling requires completion-event replay")
         store = CaptureStore(config.capacity_bytes, deduplicate=True, start_time=HORIZON_START)
         beliefs: dict[str, _Belief] = {}; dirty: set[str] = set()
         # Content-free repair metadata: last completed known hash and byte length.
         last_known: dict[str, tuple[str, int]] = {}
+        pending_by_seq: dict[int, PendingBodyRequest] = {}
+        pending_by_title: dict[str, int] = {}
+        result_indexes: dict[int, int] = {}
         polls=[]; sweeps=[]; results=[]; attempts=[]
         peak_discovered=peak_dirty=metadata_peak=0
         sweep_iter=iter(periodic_sweep_times(config.interval_us, config.phase_us,
                                              checkpoint=config.checkpoint))
         next_sweep=next(sweep_iter,None); next_poll=HORIZON_START
         poll_step=timedelta(microseconds=self.observer.config.feed_poll_interval_us)
-        while next_poll<=config.checkpoint or next_sweep is not None:
-            if next_poll<=config.checkpoint and (next_sweep is None or next_poll<=next_sweep):
+
+        def apply_completion(response: BodyResponse) -> None:
+            nonlocal metadata_peak
+            pending = pending_by_seq.pop(response.request_seq, None)
+            if pending is not None:
+                remaining = pending_by_title[pending.page_key] - 1
+                if remaining:
+                    pending_by_title[pending.page_key] = remaining
+                else:
+                    del pending_by_title[pending.page_key]
+                results[result_indexes[response.request_seq]] = response
+            if response.outcome is BodyOutcome.BODY:
+                assert response.body is not None
+                capture=Capture(response.page_key,response.response_time,
+                                response.request_seq,response.body)
+                attempts.append(CaptureAttempt(capture,store.admit(capture)))
+                last_known[response.page_key]=(capture.body_sha256,len(capture.body))
+            else:
+                # Every unavailable completed outcome disables repair until a
+                # later known-body completion for this title.
+                last_known.pop(response.page_key,None)
+            metadata_peak=max(metadata_peak,len(canonical_jsonl({
+                page:[digest,length] for page,(digest,length) in sorted(last_known.items())})))
+
+        while next_poll<=config.checkpoint or next_sweep is not None or pending_by_seq:
+            next_completion=min((item.response_time for item in pending_by_seq.values()),
+                                default=None)
+            candidates=[value for value in (next_poll if next_poll<=config.checkpoint else None,
+                                              next_completion, next_sweep)
+                        if value is not None]
+            if not candidates:
+                break
+            now=min(candidates)
+            if now>config.checkpoint:
+                break
+
+            # At a common instant the frozen order is feed update, due
+            # completion, then the new periodic reads.
+            if next_poll<=config.checkpoint and next_poll==now:
                 poll=self.observer.poll_feed(next_poll); polls.append(poll)
                 self._apply_feed_batch(poll,beliefs,dirty)
                 peak_discovered=max(peak_discovered,len(beliefs)); peak_dirty=max(peak_dirty,len(dirty))
-                next_poll+=poll_step; continue
+                next_poll+=poll_step
+            if next_completion==now:
+                for response in self.observer.complete_due(now):
+                    apply_completion(response)
+            if next_sweep!=now:
+                continue
+
             assert next_sweep is not None; sweeps.append(next_sweep)
             ordinary={p for p in dirty if beliefs[p] in {_Belief.LIVE,_Belief.MIXED}}
             repairs=set()
             prospective=len(results)+1
             for page_key,(body_hash,body_len) in last_known.items():
                 if beliefs.get(page_key) not in {_Belief.LIVE,_Belief.MIXED}: continue
+                if pending_by_title.get(page_key,0): continue
                 retained=any(p.page_key==page_key and p.body_sha256==body_hash
                              for p in store.retained_captures)
                 if retained: continue
@@ -376,14 +421,12 @@ class PeriodicCollector:
                     if config.capacity_bytes is not None and len(dummy.packet_bytes)+body_len>config.capacity_bytes:
                         continue
                 response=self.observer.get_body(page_key,next_sweep); results.append(response)
-                if not isinstance(response,BodyResponse): raise CollectorError("PCD-R R block response unexpectedly pending")
-                if response.outcome is BodyOutcome.BODY:
-                    assert response.body is not None
-                    capture=Capture(page_key,response.response_time,response.request_seq,response.body)
-                    attempts.append(CaptureAttempt(capture,store.admit(capture)))
-                    last_known[page_key]=(capture.body_sha256,len(capture.body))
+                result_indexes[response.request_seq]=len(results)-1
+                if isinstance(response,PendingBodyRequest):
+                    pending_by_seq[response.request_seq]=response
+                    pending_by_title[page_key]=pending_by_title.get(page_key,0)+1
                 else:
-                    last_known.pop(page_key,None)
+                    apply_completion(response)
             dirty.difference_update(ordinary)
             metadata_peak=max(metadata_peak,len(canonical_jsonl({
                 page:[digest,length] for page,(digest,length) in sorted(last_known.items())})))

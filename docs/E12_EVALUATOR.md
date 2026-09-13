@@ -10,11 +10,11 @@ The loader freezes each proposition's evidence ID, annotation-provided `critical
 
 ## Retained-only firewall
 
-`RetainedSnapshot` is the exclusive evaluator-facing collector representation. `RetainedSnapshot.from_collector_result()` reads bodies only from `CollectorResult.retained_evidence` and context only from delivered `feed_polls`. No scoring API accepts `body_results`, `capture_attempts`, raw trace bodies, rejected/oversize bodies, evicted bodies, or diagnostic history.
+`RetainedSnapshot` is the exclusive evaluator-facing collector representation. `RetainedSnapshot.from_collector_result()` reads the immutable store-derived `retained_export`: retained packets, referenced body objects and declared refcounts, canonical packet bytes, synchronized totals and capacity. Context comes only from charged delivered feed records. No scoring API accepts `body_results`, `capture_attempts`, raw trace bodies, rejected/oversize bodies, evicted bodies, or diagnostic history.
 
 Synthetic poison tests confirm that bodies visible in diagnostic results but rejected or absent from the final capped store cannot satisfy evidence.
 
-Before any coverage or delay path scores a snapshot, it recomputes SHA-256 over every retained canonical body and compares it with the supplied `body_sha256`. Any mismatch raises `SnapshotIntegrityError`; the evaluator never repairs the hash or drops only the corrupt record. It also rejects any retained body with `capture_time > checkpoint`. A capture exactly at the checkpoint is permitted. These checks cover the complete snapshot, including records unrelated to the fragment currently being tested, so one corrupt record invalidates the whole evaluation.
+Before scoring, the evaluator validates every packet-to-object reference, independently derives and checks object refcounts, rejects hidden zero-reference objects, recomputes canonical packet/body bytes and totals, and enforces the cap from derived bytes even if a declared total is absent. It also recomputes SHA-256, rejects non-canonical UTF-8 and rejects captures after the checkpoint. A capture exactly at the checkpoint is permitted. Any defect raises `SnapshotIntegrityError` and invalidates the complete snapshot; corrupt records are never skipped or repaired.
 
 ## Proposition and support semantics
 
@@ -38,7 +38,7 @@ Raw revision JSON bodies are decoded according to E05 custody in two stages: the
 
 `evaluate_benchmark()` accepts `split="dev"`, `split="held_out"`, or `split="full"` and an independent `critical_only` flag. Both are annotation-derived before any retained snapshot is inspected; collector outcomes cannot affect membership. Ineligible propositions are excluded with their frozen reason. Non-critical filtering uses only the frozen boolean field.
 
-The current structural benchmark properties are 65 propositions: 34 dev and 31 held-out; 57 critical; 64 core-eligible and one excluded. The future primary held-out/critical core denominator is 27 as a benchmark property only.
+The frozen benchmark has 65 propositions: 38 development and 27 held-out, with 57 critical propositions (34 development-critical and 23 held-out-critical). All 65 proposition-level units are eligible under alternative-specific support filtering: an invalid support revision is excluded without removing a proposition that retains another valid alternative. The primary held-out critical denominator is **K=23**.
 
 ## Coverage and delay
 
@@ -46,15 +46,14 @@ Core coverage is true exactly when at least one complete frozen alternative is s
 
 Delay is the earliest completed retained alternative time minus the earliest frozen eligible support time. A multi-fragment completion time is its latest fragment acquisition; the earliest completed valid alternative wins. Results distinguish `retained`, `unretained`, and `na_unknown_support`; an unretained proposition never receives zero delay.
 
-## Context axis
+## Frozen context axis
 
-The repository's `context_fragments_DRAFT_SAM.jsonl`, `context_eligibility_DRAFT_SAM.jsonl`, and `A11_CONTEXT_AXIS_DRAFT_SAM.md` remain drafts and are not loaded by the accepted core loader. The benchmark records `context_status="NOT_FROZEN"`. Context evaluation returns `NOT_FROZEN`, with percentage NA and denominator zero, rather than a misleading 0% failure. A future accepted artifact can set a frozen context schema explicitly.
+Context is **FROZEN**. The accepted loader reads `context_fragments.jsonl`, `context_eligibility.jsonl`, and `context_occurrences.jsonl`; DRAFT basenames are rejected. Fifty-seven propositions are self-contained, so context equals core. Eight require additional context and all eight have frozen groundable alternatives. Context alternatives are ORed, fragments inside an alternative are ANDed, and every context alternative structurally contains a valid core alternative. Unknown or unavailable required context stays in the same scoped denominator and produces the frozen lower/upper interval rather than being coerced to zero or removed. The primary held-out critical context denominator is the same K=23 as core.
 
 ## Explicitly not scored or implemented here
 
 - No PCD-versus-E comparison, policy sweep, or X13 result.
 - No real collector result was joined to A11 during implementation or verification.
-- No draft context ground truth.
 - No policy conclusion, threshold decision, group robustness, archive sensitivity, PCD-R, F collector, or X13 output suite.
 
 The evaluator handles one retained collector snapshot at a time and produces no comparative conclusion.

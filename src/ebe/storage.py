@@ -96,6 +96,7 @@ class RetainedStoreExport:
     total_bytes: int
     peak_bytes: int
     accounting: StorageSnapshot
+    accounting_points: tuple[tuple[datetime, int], ...]
 
 
 @dataclass(slots=True)
@@ -182,6 +183,7 @@ class CaptureStore:
         self._oversize = 0
         self._audit: list[StorageAuditRecord] = []
         self._size_history: list[int] = [0]
+        self._accounting_points: list[tuple[datetime, int]] = [(self._last_time, 0)]
 
     @classmethod
     def from_retained_export(cls, export: RetainedStoreExport) -> "CaptureStore":
@@ -217,6 +219,7 @@ class CaptureStore:
             store._last_order = (p.capture_time, p.request_seq, p.page_key)
         store._last_time = export.checkpoint
         store._size_history = [store.current_bytes]
+        store._accounting_points = list(export.accounting_points)
         return store
 
     @property
@@ -234,6 +237,10 @@ class CaptureStore:
     @property
     def size_history(self) -> tuple[int, ...]:
         return tuple(self._size_history)
+
+    @property
+    def accounting_points(self) -> tuple[tuple[datetime, int], ...]:
+        return tuple(self._accounting_points)
 
     def _advance(self, timestamp: datetime) -> None:
         timestamp = require_utc(timestamp)
@@ -269,6 +276,7 @@ class CaptureStore:
             self._evicted_body_bytes += body_len
             del self._objects[oldest.object_id]
         self._size_history.append(self.current_bytes)
+        self._accounting_points.append((self._last_time, self.current_bytes))
         return oldest.request_seq
 
     def admit(self, capture: Capture) -> AdmissionResult:
@@ -322,6 +330,7 @@ class CaptureStore:
         self._admitted += 1
         self._peak_bytes = max(self._peak_bytes, self.current_bytes)
         self._size_history.append(self.current_bytes)
+        self._accounting_points.append((capture.capture_time, self.current_bytes))
         self._audit.append(StorageAuditRecord(
             capture.request_seq, capture.page_key, capture.capture_time,
             capture.body_sha256, b, p, "admitted", tuple(evicted),
@@ -391,6 +400,7 @@ class CaptureStore:
             require_utc(checkpoint, "checkpoint"), self.capacity_bytes,
             tuple(self._packets), objects, packet_bytes, body_bytes,
             packet_bytes + body_bytes, snap.peak_store_bytes, snap,
+            tuple(self._accounting_points),
         )
 
 

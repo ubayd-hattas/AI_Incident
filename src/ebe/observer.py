@@ -171,6 +171,9 @@ class ObserverCosts:
     peak_shared_metadata_bytes: int
     final_shared_metadata_bytes: int
     shared_metadata_byte_microseconds: int
+    feed_metadata_bytes: int
+    directory_metadata_bytes: int
+    accounting_points: tuple[tuple[datetime, int], ...]
 
     @property
     def shared_metadata_byte_hours(self) -> float:
@@ -481,11 +484,17 @@ class Observer:
             accrued += running * elapsed_microseconds(last, when)
             running += amount; peak_metadata = max(peak_metadata, running); last = when
         accrued += running * elapsed_microseconds(last, cutoff)
+        accounting_points: list[tuple[datetime, int]] = [(HORIZON_START, 0)]
+        running_for_points = 0
+        for when, amount in sorted(additions):
+            running_for_points += amount
+            accounting_points.append((when, running_for_points))
 
         outcomes = {outcome: 0 for outcome in BodyOutcome}
         pending = 0
-        downloaded_metadata = sum(size for when, size, _ in self._feed_audit if when <= cutoff)
-        downloaded_metadata += sum(size for when, size in self._directory_audit if when <= cutoff)
+        feed_metadata = sum(size for when, size, _ in self._feed_audit if when <= cutoff)
+        directory_metadata = sum(size for when, size in self._directory_audit if when <= cutoff)
+        downloaded_metadata = feed_metadata + directory_metadata
         downloaded_body = 0
         unknown = 0
         for record in self._audit:
@@ -525,6 +534,9 @@ class Observer:
             peak_metadata,
             retained_metadata,
             accrued,
+            feed_metadata,
+            directory_metadata,
+            tuple(accounting_points),
         )
 
 
