@@ -16,17 +16,23 @@ This is a research pipeline under active development, built as a sequence of fro
 **`docs/PROJECT_STATUS.md` is the single source of truth for current status.** Check it before assuming anything
 below still holds. As of writing: data ingestion, the state-reconstruction engine, the shared observer/storage
 substrate, all four collection policies (P / PD / PCD / bounded event-derived), and the evaluation benchmark are
-implemented and independently audited. The semantic evidence-coverage evaluator and the full experiment sweep have
-not been run yet.
+implemented and independently audited.
 
-**X13 (the full experiment sweep) has NOT run and is NOT authorized.** Gate 1 (Ubayd engineering readiness) and Gate 2 (Sam independent audit) are both still open.
+**X13 (the full 791-row experiment sweep) was authorized and attempted, and failed before completing its first row**
+(a 7,200-second execution timeout). A subsequent performance repair and a reduced 130-row runtime candidate were
+independently audited and found not yet authorizable: two of the reduced candidate's rows (PCD-R and F) remain
+either unproven-feasible or blocked outright. See `docs/PROJECT_STATUS.md` and
+`audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md` (sections 10-13) for the full history and exact reasons.
 
 ## Current results
 
-There are no real coverage, cost, or policy-comparison results yet.
+There is no real coverage, cost, or policy-comparison result. The submitted report states this directly rather than
+filling the gap with a placeholder number.
 
-- [SYNTHETIC, watermarked coverage-cost placeholder](figures/coverage_cost.svg): pending real X13 execution, not a finding.
-- [SYNTHETIC, watermarked Construction/ZZZ panel](figures/case_walkthrough.svg): pending real X13 execution, not a finding.
+- [Final report](report/report.tex) (PDF: `report/report.pdf`, pending a fresh recompile): the actual submission,
+  an honest incomplete-execution report with independently fact-checked citations to this repository.
+- [SYNTHETIC, watermarked coverage-cost placeholder](figures/coverage_cost.svg): superseded illustrative figure, not a finding, excluded from the final report.
+- [SYNTHETIC, watermarked Construction/ZZZ panel](figures/case_walkthrough.svg): superseded illustrative figure, not a finding, excluded from the final report.
 - [Judge walkthrough](docs/JUDGE_WALKTHROUGH.md): the one worked, inspectable development example (Construction/ZZZ, `GRP-01-CONSTRUCT`).
 
 ## Limitations
