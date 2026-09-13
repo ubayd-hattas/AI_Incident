@@ -166,6 +166,17 @@ def load_a11_benchmark(
                 quotes.append(span["quote"])
         span_quotes[evidence_id] = quotes
 
+    # Eligibility may exclude a provenance-defective support alternative without
+    # suppressing a proposition that has another frozen, eligible alternative.
+    # This is annotation-owned disposition data, not collector-derived selection.
+    excluded_support_revisions: dict[str, set[str]] = {}
+    for evidence_id, row in eligibility_by_id.items():
+        excluded = row.get("excluded_support_revisions", [])
+        if not isinstance(excluded, list) or not all(isinstance(revision_id, str) for revision_id in excluded):
+            issues.append(ValidationIssue("MALFORMED_ALTERNATIVE_ELIGIBILITY", evidence_id))
+            excluded = []
+        excluded_support_revisions[evidence_id] = set(excluded)
+
     support: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
     for occurrence_id, occurrence in occurrences_by_id.items():
         evidence_id = occurrence.get("evidence_id")
@@ -174,6 +185,8 @@ def load_a11_benchmark(
             continue
         parent = evidence_by_id[evidence_id]
         rev_id = occurrence.get("rev_id")
+        if rev_id in excluded_support_revisions.get(evidence_id, set()):
+            continue
         revision = revisions_by_id.get(rev_id)
         if revision is None:
             issues.append(ValidationIssue("UNRESOLVED_REVISION", f"{occurrence_id}:{rev_id}"))
