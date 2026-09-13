@@ -58,3 +58,19 @@ The repository's `context_fragments_DRAFT_SAM.jsonl`, `context_eligibility_DRAFT
 - No policy conclusion, threshold decision, group robustness, archive sensitivity, PCD-R, F collector, or X13 output suite.
 
 The evaluator handles one retained collector snapshot at a time and produces no comparative conclusion.
+# Final context integration — FINAL_PRE_X13_DEADLINE_v1
+
+The accepted context eligibility, fragment, and occurrence JSONL files are now
+loader inputs. DRAFT basenames fail closed. Self-contained context is exactly
+core support. Required context is compiled as the Cartesian DNF of an eligible
+core alternative union an extra-context alternative, OR across expansions and
+AND within each expansion. This enforces context-satisfied implies
+core-satisfied, including helper APIs.
+
+PROP-20260616-61 therefore has three independent extra-context branches; any
+one, together with complete retained core, suffices. Body context requires exact
+frozen page, canonical body hash, and canonical UTF-8 span bytes. Event context
+requires the exact page/action/event-time tuple, delivered by the checkpoint,
+with its minimum multiplicity. Unknown/unavailable context stays in the
+denominator and yields the exact annotation interval rather than a point score.
+Diagnostic loads are not scoreable.

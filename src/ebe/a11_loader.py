@@ -9,13 +9,18 @@ from pathlib import Path
 from typing import Any
 
 from .evaluator import (
-    Benchmark, DenominatorFirewallError, Fragment, Proposition,
+    Benchmark, BodyOccurrence, DenominatorFirewallError, Fragment, Proposition,
     ValidationIssue, ValidationReport, validate_population,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ANNOTATIONS = REPO_ROOT / "annotations"
 REVISIONS = REPO_ROOT / "data" / "raw" / "export" / "revisions.jsonl"
+ACCEPTED_CONTEXT_HASHES = {
+    "context_eligibility.jsonl": "59affb8ad353e87b98b00be21b75f22934a4c8eb3025e9384d31e79e7ba38034",
+    "context_fragments.jsonl": "485e8897dbd9c8bea51ef1e2ec000653612b5539122b52db820e9945317848bd",
+    "context_occurrences.jsonl": "040a4c8c5bff7b34428212470b1b036feab9331f02c4704a0ba80c5beefaa2f3",
+}
 
 
 def _rows(path: Path) -> list[dict[str, Any]]:
@@ -79,6 +84,10 @@ def load_a11_benchmark(
     splits_path: Path | None = None,
     revisions_path: Path | None = None,
     *,
+    context_eligibility_path: Path | None = None,
+    context_fragments_path: Path | None = None,
+    context_occurrences_path: Path | None = None,
+    freeze_manifest_path: Path | None = None,
     fail_on_error: bool = True,
 ) -> Benchmark:
     evidence_path = evidence_path or ANNOTATIONS / "evidence.jsonl"
@@ -86,11 +95,21 @@ def load_a11_benchmark(
     eligibility_path = eligibility_path or ANNOTATIONS / "eligibility.jsonl"
     splits_path = splits_path or ANNOTATIONS / "splits.json"
     revisions_path = revisions_path or REVISIONS
+    context_eligibility_path = context_eligibility_path or ANNOTATIONS / "context_eligibility.jsonl"
+    context_fragments_path = context_fragments_path or ANNOTATIONS / "context_fragments.jsonl"
+    context_occurrences_path = context_occurrences_path or ANNOTATIONS / "context_occurrences.jsonl"
+
+    for path in (context_eligibility_path, context_fragments_path, context_occurrences_path):
+        if "DRAFT" in path.name.upper():
+            raise DenominatorFirewallError(f"draft context artifact is forbidden: {path.name}")
 
     evidence_rows = _rows(evidence_path)
     occurrence_rows = _rows(occurrences_path)
     eligibility_rows = _rows(eligibility_path)
     revision_rows = _rows(revisions_path)
+    context_eligibility_rows = _rows(context_eligibility_path)
+    context_fragment_rows = _rows(context_fragments_path)
+    context_occurrence_rows = _rows(context_occurrences_path)
     with splits_path.open(encoding="utf-8") as stream:
         splits = json.load(stream)
 
@@ -99,10 +118,35 @@ def load_a11_benchmark(
     eligibility_by_id = _unique(eligibility_rows, "evidence_id", issues)
     occurrences_by_id = _unique(occurrence_rows, "occurrence_id", issues)
     revisions_by_id = _unique(revision_rows, "rev_id", issues)
+    context_eligibility_by_id = _unique(context_eligibility_rows, "evidence_id", issues)
+    context_fragments_by_id = _unique(context_fragment_rows, "context_fragment_id", issues)
+
+    if splits.get("schema_version") != "v0.1":
+        issues.append(ValidationIssue("UNKNOWN_SCHEMA", "splits.json"))
+
+    # An explicit freeze manifest is a fail-closed pin, useful to Gate 2 and to
+    # synthetic corruption tests.  Defaults are pinned below by the accepted
+    # split/context hashes and never fall back to a DRAFT basename.
+    if freeze_manifest_path is not None:
+        try:
+            freeze_value = json.loads(freeze_manifest_path.read_text(encoding="utf-8"))
+            pins = freeze_value.get("benchmark_hashes") or freeze_value.get("hashes")
+            if not isinstance(pins, dict) or not freeze_value.get("amendment"):
+                issues.append(ValidationIssue("MISSING_DISPOSITION", freeze_manifest_path.name))
+            else:
+                for path in (evidence_path, occurrences_path, eligibility_path, splits_path,
+                             context_eligibility_path, context_fragments_path, context_occurrences_path):
+                    if pins.get(path.name) != _canonical_hash(path):
+                        issues.append(ValidationIssue("ARTIFACT_HASH_MISMATCH", path.name))
+        except (OSError, json.JSONDecodeError) as exc:
+            issues.append(ValidationIssue("CORRUPT_FREEZE_MANIFEST", str(exc)))
 
     pinned = splits.get("checksums", {})
     for path, key in ((evidence_path, "evidence_jsonl_sha256"), (occurrences_path, "occurrences_jsonl_sha256")):
         if pinned.get(key) != _canonical_hash(path):
+            issues.append(ValidationIssue("ARTIFACT_HASH_MISMATCH", path.name))
+    for path in (context_eligibility_path, context_fragments_path, context_occurrences_path):
+        if ACCEPTED_CONTEXT_HASHES.get(path.name) != _canonical_hash(path):
             issues.append(ValidationIssue("ARTIFACT_HASH_MISMATCH", path.name))
 
     evidence_ids = set(evidence_by_id)
@@ -110,6 +154,10 @@ def load_a11_benchmark(
         issues.append(ValidationIssue("MISSING_ELIGIBILITY", evidence_id))
     for evidence_id in sorted(set(eligibility_by_id) - evidence_ids):
         issues.append(ValidationIssue("ORPHAN_ELIGIBILITY", evidence_id))
+    for evidence_id in sorted(evidence_ids - set(context_eligibility_by_id)):
+        issues.append(ValidationIssue("MISSING_CONTEXT_DISPOSITION", evidence_id))
+    for evidence_id in sorted(set(context_eligibility_by_id) - evidence_ids):
+        issues.append(ValidationIssue("ORPHAN_CONTEXT_DISPOSITION", evidence_id))
 
     split_by_evidence: dict[str, str] = {}
     split_by_group: dict[str, str] = {}
@@ -233,7 +281,14 @@ def load_a11_benchmark(
         if not isinstance(span, list) or len(span) != 2 or not all(type(x) is int for x in span) or not 0 <= span[0] < span[1] <= len(body):
             issues.append(ValidationIssue("MALFORMED_OCCURRENCE_SPAN", occurrence_id))
             continue
-        quote = body[span[0]:span[1]]
+        try:
+            quote = raw[span[0]:span[1]].decode(
+                {"ascii": "ascii", "utf8": "utf-8", "latin1": "latin-1"}[encoding],
+                errors="strict",
+            )
+        except (UnicodeError, KeyError):
+            issues.append(ValidationIssue("OCCURRENCE_COORDINATE_MAPPING", occurrence_id))
+            continue
         matching_indices = [index for index, expected in enumerate(span_quotes[evidence_id]) if expected == quote]
         if len(matching_indices) != 1:
             issues.append(ValidationIssue("OCCURRENCE_NOT_ALLOWED_SUPPORT", occurrence_id))
@@ -252,6 +307,69 @@ def load_a11_benchmark(
         bucket["spans"].setdefault(span_index, (quote, occurrence_id))
 
     fragments: dict[str, Fragment] = {}
+    context_occurrences: dict[str, list[BodyOccurrence]] = defaultdict(list)
+    for row_index, occurrence in enumerate(context_occurrence_rows, 1):
+        fragment_id = occurrence.get("context_fragment_id")
+        if fragment_id not in context_fragments_by_id:
+            issues.append(ValidationIssue("ORPHAN_CONTEXT_OCCURRENCE", str(fragment_id)))
+            continue
+        revision = revisions_by_id.get(occurrence.get("rev_id"))
+        if revision is None:
+            issues.append(ValidationIssue("UNRESOLVED_CONTEXT_REVISION", f"{fragment_id}:{row_index}"))
+            continue
+        try:
+            raw = _raw_body_bytes(revision["body"])
+            codec = {"ascii": "ascii", "utf8": "utf-8", "latin1": "latin-1"}[
+                revision.get("body_encoding", "ascii")]
+            canonical_text = raw.decode(codec, errors="strict")
+            canonical = canonical_text.encode("utf-8")
+            source_span = occurrence["source_projection_span"]
+            canonical_span = occurrence["canonical_char_span"]
+            if hashlib.sha256(raw).hexdigest() != occurrence.get("source_body_sha256"):
+                raise ValueError("source hash")
+            if hashlib.sha256(canonical).hexdigest() != occurrence.get("canonical_body_sha256"):
+                raise ValueError("canonical hash")
+            source_piece = raw[source_span[0]:source_span[1]].decode(codec, errors="strict")
+            canonical_piece = canonical_text[canonical_span[0]:canonical_span[1]]
+            if source_piece != canonical_piece:
+                raise ValueError("coordinate mapping")
+            context_occurrences[fragment_id].append(BodyOccurrence(
+                occurrence["page_key"], occurrence["canonical_body_sha256"],
+                canonical_piece.encode("utf-8"),
+                f"CTXOCC-{row_index:04d}:{fragment_id}"))
+        except (KeyError, TypeError, ValueError, UnicodeError, IndexError) as exc:
+            issues.append(ValidationIssue(
+                "CORRUPT_CONTEXT_OCCURRENCE", f"{fragment_id}:{row_index}:{exc}"))
+
+    for fragment_id, definition in context_fragments_by_id.items():
+        if definition.get("evidence_id") not in evidence_by_id:
+            issues.append(ValidationIssue("ORPHAN_CONTEXT_FRAGMENT", fragment_id))
+            continue
+        predicate = definition.get("event_predicate")
+        if isinstance(predicate, dict):
+            try:
+                fragments[fragment_id] = Fragment(
+                    fragment_id, predicate["page_key"], "observable_feed",
+                    feed_action=predicate["action"],
+                    source_ref=definition.get("context_event_id"),
+                    event_time=_utc(predicate["event_time"]),
+                    minimum_multiplicity=predicate.get("minimum_multiplicity", 1),
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                issues.append(ValidationIssue(
+                    "CORRUPT_CONTEXT_FRAGMENT", f"{fragment_id}:{exc}"))
+        else:
+            occurrences = tuple(context_occurrences.get(fragment_id, ()))
+            if not occurrences:
+                issues.append(ValidationIssue("MISSING_CONTEXT_OCCURRENCES", fragment_id))
+                continue
+            first = occurrences[0]
+            fragments[fragment_id] = Fragment(
+                fragment_id, first.page_key, "body_span", first.required_bytes,
+                body_sha256=first.body_sha256,
+                source_ref=definition.get("context_rev_id"),
+                body_occurrences=occurrences,
+            )
     propositions: list[Proposition] = []
     for evidence_id, row in evidence_by_id.items():
         alternatives: list[tuple[str, ...]] = []
@@ -294,16 +412,55 @@ def load_a11_benchmark(
             critical = False
         if eligible and critical and not alternatives:
             issues.append(ValidationIssue("ELIGIBLE_CRITICAL_WITHOUT_CORE_SUPPORT", evidence_id))
+        context_row = context_eligibility_by_id.get(evidence_id, {})
+        declared_state = context_row.get("context_state")
+        if declared_state in ("unknown", "unavailable"):
+            context_state = declared_state
+            context_alternatives: tuple[tuple[str, ...], ...] = ()
+        elif context_row.get("anchor_self_contained") is True and context_row.get("context_needed") is False:
+            context_state = "self_contained"
+            context_alternatives = tuple(alternatives)
+        elif context_row.get("context_needed") is True:
+            context_state = "required"
+            fragment_ids = context_row.get("context_fragment_ids")
+            extra = context_row.get("context_alternatives")
+            if extra is None:
+                extra = [fragment_ids] if fragment_ids else []
+            if (not isinstance(fragment_ids, list)
+                    or not isinstance(extra, list)
+                    or any(not isinstance(x, list) or not x for x in extra)):
+                issues.append(ValidationIssue("MALFORMED_CONTEXT_ALTERNATIVES", evidence_id))
+                extra = []
+            else:
+                flattened = [item for branch in extra for item in branch]
+                if sorted(flattened) != sorted(fragment_ids):
+                    issues.append(ValidationIssue("CONTEXT_FRAGMENT_FLATTENING_MISMATCH", evidence_id))
+            for branch in extra:
+                for fragment_id in branch:
+                    if fragment_id not in context_fragments_by_id:
+                        issues.append(ValidationIssue("ORPHAN_CONTEXT_REFERENCE", f"{evidence_id}:{fragment_id}"))
+            context_alternatives = tuple(
+                tuple(dict.fromkeys((*core, *branch)))
+                for core in alternatives for branch in extra
+            )
+            if not context_alternatives:
+                issues.append(ValidationIssue("REQUIRED_CONTEXT_WITHOUT_ALTERNATIVE", evidence_id))
+        else:
+            context_state = "unknown"
+            context_alternatives = ()
+            issues.append(ValidationIssue("MISSING_CONTEXT_DISPOSITION", evidence_id))
         propositions.append(Proposition(
             evidence_id=evidence_id,
             critical=critical,
             core_alternatives=tuple(alternatives),
+            context_alternatives=context_alternatives,
             eligible=eligible,
             eligibility_reason=reason,
             earliest_eligible_support=min(support_times) if eligible and support_times else None,
             split=prop_split if prop_split in ("dev", "held_out") else None,
             group_id=group_id if isinstance(group_id, str) else None,
             claim_status=row.get("claim_status") if isinstance(row.get("claim_status"), str) else None,
+            context_state=context_state,
         ))
 
     try:
@@ -311,12 +468,14 @@ def load_a11_benchmark(
     except DenominatorFirewallError as exc:
         issues.append(ValidationIssue("POPULATION_FIREWALL", str(exc)))
 
-    paths = (evidence_path, occurrences_path, eligibility_path, splits_path)
+    paths = (evidence_path, occurrences_path, eligibility_path, splits_path,
+             context_eligibility_path, context_fragments_path, context_occurrences_path)
     hashes = tuple((path.name, _canonical_hash(path)) for path in paths)
     report = ValidationReport(len(propositions), len(fragments), len(occurrence_rows), tuple(issues))
     benchmark = Benchmark(
         tuple(propositions), fragments, report, hashes,
-        benchmark_id=splits.get("dataset_name", "A11"), context_status="NOT_FROZEN",
+        benchmark_id=splits.get("dataset_name", "A11"), context_status="FROZEN",
+        scoreable=fail_on_error and not issues,
     )
     if fail_on_error:
         report.raise_for_errors()

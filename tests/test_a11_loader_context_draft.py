@@ -43,8 +43,8 @@ class DraftContextStructuralTests(unittest.TestCase):
                 self.assertIn("body_span", kinds, prop.evidence_id)
             else:
                 alt = prop.context_alternatives[0]
-                self.assertEqual(len(alt), 1, prop.evidence_id)
-                self.assertEqual(fragments[alt[0]].kind, "observable_feed", prop.evidence_id)
+                self.assertGreaterEqual(len(alt), 1, prop.evidence_id)
+                self.assertIn("body_span", {fragments[fid].kind for fid in alt}, prop.evidence_id)
 
     def test_all_65_marked_context_eligible_in_draft(self) -> None:
         _, _, eligibility = load_draft_context()

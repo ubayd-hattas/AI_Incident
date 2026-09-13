@@ -51,11 +51,10 @@ class A11LoaderStructuralTests(unittest.TestCase):
         self.assertTrue(all(len(alt) == 2 for alt in prop.core_alternatives))
         self.assertTrue(all(fid in fragments for alt in prop.core_alternatives for fid in alt))
 
-    def test_no_context_alternatives_modeled_yet(self) -> None:
-        # Explicitly documents the current limitation -- context fragments
-        # don't exist yet (acceptance-matrix item C context half).
+    def test_context_alternatives_are_finally_compiled(self) -> None:
         propositions = self.benchmark.propositions
-        self.assertTrue(all(p.context_alternatives == () for p in propositions))
+        self.assertTrue(all(p.context_alternatives for p in propositions))
+        self.assertEqual(sum(p.context_state == "required" for p in propositions), 8)
 
     def test_group_split_leakage_is_rejected(self) -> None:
         source = ROOT / "annotations"
@@ -92,8 +91,8 @@ class A11LoaderStructuralTests(unittest.TestCase):
         prop = next(p for p in self.benchmark.propositions if p.evidence_id == "PROP-20260619-03")
         self.assertEqual(prop.claim_status, "agent-reported action/result")
 
-    def test_context_axis_is_explicitly_not_frozen(self) -> None:
-        self.assertEqual(self.benchmark.context_status, "NOT_FROZEN")
+    def test_context_axis_is_frozen(self) -> None:
+        self.assertEqual(self.benchmark.context_status, "FROZEN")
         self.assertTrue(self.benchmark.validation.valid)
 
 

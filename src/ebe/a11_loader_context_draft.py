@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .a11_loader import load_real_propositions
@@ -68,9 +69,12 @@ def load_draft_context(
                     page_key=frag_row["page_key"],
                     kind="observable_feed",
                     feed_action=frag_row["feed_action"],
+                    event_time=datetime(1970, 1, 1, tzinfo=timezone.utc),
                 )
             fragment_ids.append(fragment_id)
-        updated.append(replace(prop, context_alternatives=(tuple(fragment_ids),)))
+        updated.append(replace(prop,
+            context_alternatives=tuple(tuple((*core, *fragment_ids)) for core in prop.core_alternatives),
+            context_state="required"))
 
     return tuple(updated), fragments_by_id, context_eligibility
 

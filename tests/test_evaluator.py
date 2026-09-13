@@ -156,7 +156,7 @@ class FragmentSatisfactionTests(unittest.TestCase):
             bodies=(),
             feed_context=(RetainedFeedRecord("dse~A", "delete", M(2), M(3)),),
         )
-        fragment = Fragment("f1", "dse~A", "observable_feed", feed_action="delete")
+        fragment = Fragment("f1", "dse~A", "observable_feed", feed_action="delete", event_time=M(2))
         prop = Proposition("P1", True, (("f1",),))
         satisfied, when = core_covered(prop, {"f1": fragment}, snapshot)
         self.assertTrue(satisfied)
@@ -268,9 +268,11 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         )
         fragments = {
             "core1": Fragment("core1", "dse~C", "body_span", required_substring=b"core claim"),
-            "ctx1": Fragment("ctx1", "dse~C", "observable_feed", feed_action="delete"),
+            "ctx1": Fragment("ctx1", "dse~C", "observable_feed", feed_action="delete", event_time=M(5)),
         }
-        prop = Proposition("P1", True, (("core1",),), context_alternatives=(("ctx1",),))
+        prop = Proposition("P1", True, (("core1",),),
+                           context_alternatives=(("core1", "ctx1"),),
+                           context_state="required")
         core_result = compute_core_coverage([prop], fragments, snapshot, critical_only=False)
         ctx_result = compute_context_coverage([prop], fragments, snapshot, critical_only=False)
         self.assertEqual(core_result.numerator, 1)  # by hand: core satisfied
@@ -382,9 +384,9 @@ class HandScoredAcceptanceTests(unittest.TestCase):
             {"f": Fragment("f", "dse~A", "body_span", b"x")},
             RetainedSnapshot(M(5), (), ()), critical_only=False,
         )
-        self.assertEqual(result.status, "NOT_FROZEN")
-        self.assertEqual(result.denominator, 0)
-        self.assertIsNone(result.percentage)
+        self.assertEqual(result.status, "OK")
+        self.assertEqual(result.denominator, 1)
+        self.assertEqual(result.percentage, 0.0)
 
     def test_split_filter_and_critical_denominator_are_annotation_driven(self) -> None:
         fragments = {"f": Fragment("f", "dse~A", "body_span", b"claim")}
@@ -444,7 +446,7 @@ class HandScoredAcceptanceTests(unittest.TestCase):
     def test_population_firewall_accepts_body_plus_feed(self) -> None:
         fragments = {
             "body": Fragment("body", "dse~Page", "body_span", b"claim"),
-            "feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete"),
+            "feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete", event_time=M(2)),
         }
         validate_population([Proposition("P", True, (("body", "feed"),))], fragments)
 
@@ -455,14 +457,14 @@ class HandScoredAcceptanceTests(unittest.TestCase):
                 validate_population([Proposition("P", True, (("body",),))], fragments)
 
     def test_population_firewall_rejects_feed_only_core(self) -> None:
-        fragments = {"feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete")}
+        fragments = {"feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete", event_time=M(2))}
         with self.assertRaises(DenominatorFirewallError):
             validate_population([Proposition("P", True, (("feed",),))], fragments)
 
     def test_population_firewall_rejects_population_if_one_alternative_is_feed_only(self) -> None:
         fragments = {
             "body": Fragment("body", "dse~Page", "body_span", b"claim"),
-            "feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete"),
+            "feed": Fragment("feed", "dse~Page", "observable_feed", feed_action="delete", event_time=M(2)),
         }
         with self.assertRaises(DenominatorFirewallError):
             validate_population([Proposition("P", True, (("body",), ("feed",)))], fragments)
