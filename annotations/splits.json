@@ -3,8 +3,8 @@
   "dataset_name": "Evidence Before Erasure (EBE) Benchmark v0.1",
   "frozen_utc": "2026-09-12T20:55:00Z",
   "checksums": {
-    "evidence_jsonl_sha256": "a1d201a437adffad3b7571ffdd3e21eea2b03f34d054f71ba71634afb32945f3",
-    "occurrences_jsonl_sha256": "95e028eb6318678f7049ca002c605bacc7af2719cc565805c0ca49ea6bef66f2",
+    "evidence_jsonl_sha256": "2efff9113056a797614de940c28b3fe1f5aac301fdaf3250c8fc83978c88565b",
+    "occurrences_jsonl_sha256": "02542d8e78b640da45f05cc1376c92226c459c44cdcbc1f782e022b932ad0c9d",
     "_checksum_domain_note": "Hashes are the canonical SHA-256 of the actual committed git blob (LF-normalized), not a local working-tree read -- see audit/R04_ACCOUNTING_VERIFICATION.md's correction note for why that distinction matters (Windows core.autocrlf=true silently converts LF to CRLF on checkout). A root .gitattributes (`* text=auto eol=lf`) makes normalization explicit.",
     "_occurrences_jsonl_content_note": "occurrences_jsonl_sha256 updated 2026-09-13 (Sam, audit/occurrence_census_search.py) after adding 60 occurrence rows for PROP-20260619-01: 2 for its own anchor revision (source_spans Alex already recorded but that were never transcribed into occurrences.jsonl) plus 58 exact-match cumulative_carryforward occurrences found by an exhaustive whole-DSE search (a fixed page header persisting unchanged across dse~DataUSAConstructionWageSep18Live@2 through @30). All added rows are byte-exact substring matches of the proposition's own already-recorded source_spans quotes -- no new semantic judgment, no near-copy/paraphrase equivalence calls. Re-running the search after this fix finds 0 remaining exact-match gaps across all 65 propositions. Prior hash: 7edb1331c44ecbfd9efa2eed9fe8ef82f082dab20c161a53c5f7706d1005875c (this was itself already a CRLF-vs-canonical artifact, not a content hash of the pre-fix content -- see R04_ACCOUNTING_VERIFICATION.md's note).",
     "_evidence_jsonl_content_note": "evidence.jsonl's actual CONTENT changed 2026-09-12 (Sam, audit/A11_INDEPENDENT_VERIFICATION.md): PROP-20260619-03/PROP-20260620-09's critical_reason/notes were revised to remove epistemic-leakage prose flagged by docs/PRE_RESULTS_AUDIT.md (treating an agent self-report as externally 'confirming' fact). No spans, hashes, quotations, claim_status, or critical flags changed -- only the two rationale/notes fields. (This note is about the content change; see _checksum_domain_note above for the separate hash-representation correction.)"
@@ -14,11 +14,11 @@
     "critical_propositions": 57,
     "non_critical_propositions": 8,
     "total_episodes": 71,
-    "dev_episodes": 37,
-    "held_out_episodes": 34,
+    "dev_episodes": 39,
+    "held_out_episodes": 32,
     "total_groups": 25,
-    "dev_groups": 13,
-    "held_out_groups": 12,
+    "dev_groups": 14,
+    "held_out_groups": 11,
     "total_occurrences": 1421
   },
   "groups": {
@@ -32,7 +32,7 @@
       "description": "Female electricians 2014-2019 wage coordination, answer cache, and ZZZ fallback mirror."
     },
     "GRP-02-OECD-WORKAROUND": {
-      "split": "held_out",
+      "split": "dev",
       "category": "Restriction Workarounds & Network Evasion",
       "pages": [
         "OAIEquityDec30Raw",
@@ -263,7 +263,8 @@
         "GRP-18-OECD-CO2",
         "GRP-21-FRONT-PAGE-AI",
         "GRP-23-TEST-FOOBA",
-        "GRP-24-CTRL-RESEARCH-BRIDGE"
+        "GRP-24-CTRL-RESEARCH-BRIDGE",
+        "GRP-02-OECD-WORKAROUND"
       ],
       "page_keys": [
         "dse~AI",
@@ -293,7 +294,9 @@
         "dse~PoliceWageAgeSequenceMar10Collab",
         "dse~TestFoobaAgent",
         "dse~TransportSequenceLiveRelayR3",
-        "dse~ZZZDataUSAConstructionWageLive"
+        "dse~ZZZDataUSAConstructionWageLive",
+        "dse~OAIEquityDec30Raw",
+        "dse~OECDJun26PrecisionScout"
       ],
       "episode_ids": [
         "EP-DataUSAConstructionWageSep18Live-01",
@@ -332,7 +335,9 @@
         "EP-OECDRegionalRecoveryCO2R6Relay-01",
         "EP-AI-01",
         "EP-TestFoobaAgent-01",
-        "EP-OpenResearchBridgeFeb03-01"
+        "EP-OpenResearchBridgeFeb03-01",
+        "EP-OAIEquityDec30Raw-01",
+        "EP-OECDJun26PrecisionScout-01"
       ],
       "evidence_ids": [
         "PROP-20260619-01",
@@ -368,12 +373,15 @@
         "PROP-20260621-56",
         "PROP-20260621-57",
         "PROP-20260621-58",
-        "PROP-20260618-63"
+        "PROP-20260618-63",
+        "PROP-20260620-06",
+        "PROP-20260620-07",
+        "PROP-20260620-08",
+        "PROP-20260620-09"
       ]
     },
     "held_out": {
       "group_ids": [
-        "GRP-02-OECD-WORKAROUND",
         "GRP-04-PROXY-RECREATE",
         "GRP-06-ASIAN-ENROLL-ZZZ",
         "GRP-08-CVD-DEATHS",
@@ -401,8 +409,6 @@
         "dse~DataUSAPovertyR5LiveSep13",
         "dse~HealthdataCVDSequenceCollab",
         "dse~MaidsR3FastRelayOct11",
-        "dse~OAIEquityDec30Raw",
-        "dse~OECDJun26PrecisionScout",
         "dse~OpenAIHealthdataCVDFeb05",
         "dse~OpenAIMassNamesJune20Second",
         "dse~OpenAIMassValuesJune20Master",
@@ -411,8 +417,6 @@
         "dse~ZZZEnrollmentAsianFeb21Help"
       ],
       "episode_ids": [
-        "EP-OAIEquityDec30Raw-01",
-        "EP-OECDJun26PrecisionScout-01",
         "EP-AgentProxyCountyNext987111-01",
         "EP-AgentProxyCountyNext987111-02",
         "EP-AgentProxyCountyNext987111-03",
@@ -447,10 +451,6 @@
         "EP---help-02"
       ],
       "evidence_ids": [
-        "PROP-20260620-06",
-        "PROP-20260620-07",
-        "PROP-20260620-08",
-        "PROP-20260620-09",
         "PROP-20260618-14",
         "PROP-20260618-15",
         "PROP-20260618-16",

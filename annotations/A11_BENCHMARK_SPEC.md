@@ -23,11 +23,13 @@
 
 ---
 
+> **Encoding/provenance correction (2026-09-14, Jaswin; before X13):** E05 defines every raw JSON `body` as a Latin-1 projection of original bytes. Correct reconstruction is `body.encode("latin-1")`, verify that byte string against the revision `body_sha256`, then decode with the declared source encoding to canonical Unicode UTF-8 text. This exposed wrong stored raw-body hashes on `PROP-20260617-17/-18` and 80 exact occurrence records, and wrong canonical character body lengths (1705 → 1704) on those two evidence rows. All quotations and zero-based Unicode spans reproduce without change: Case A (provenance metadata), not a projection/span or semantic-support correction. The pilot group `GRP-02-OECD-WORKAROUND` was moved whole to development as required by the pre-existing fallback rule; no group was rebalanced. `PROP-20260618-63` now has alternative-specific eligibility: its `dse~AI@2` anchor remains excluded, while its already-recorded exact `dse~AgentSecCountyVarAI@1` alternative is eligible. See `audit/A11_ENCODING_PROVENANCE_REPAIR.md`.
+
 ## 1. Executive Summary & Estimand Compliance
 
 This document formally registers and cryptographically freezes the benchmark evaluation dataset for **Evidence Before Erasure (EBE)**, fulfilling all contractual criteria defined in `docs/EXECUTION_SPEC_v0.1.md` §3, §7 (Ticket A11), and `docs/R04_FROZEN_SPEC.md`:
 
-- **Target Episodes**: **71 validated page episodes** (37 Development / 34 Held-Out), greatly exceeding the $\ge 40$ episodes target.
+- **Target Episodes**: **71 validated page episodes** (39 Development / 32 Held-Out), greatly exceeding the $\ge 40$ episodes target.
 - **Title/Copy Groups**: **25 distinct groups** spanning 50 individual pages (revised 2026-09-12 to include 7 previously-uncataloged cross-title mirror pages, see correction note above), exceeding the $\ge 20$ groups target.
 - **Atomic Evidence Propositions**: **65 distinct propositions** (**57 critical, 8 non-critical** — corrected 2026-09-13, Sam: the "49/16" figure previously here did not match `evidence.jsonl`'s own `critical` field or `splits.json`'s `summary` block, which have always said 57/8; this was stale prose, not a data or judgment change), comfortably within the contractual 60–120 proposition range.
 - **Occurrence Census**: **1,421 verified occurrence records** (revised 2026-09-13: +60 for `PROP-20260619-01`, found by an exhaustive whole-DSE exact-match search after the acceptance matrix flagged it as having zero occurrence rows despite two valid anchor spans — see `audit/occurrence_census_search.py`) identified across the entire 13,403-revision DSE corpus, mapping primary introductions, cumulative carryforwards, and cross-title backup mirrors. This closes the *exact-match* completeness gap only (item D); normalized/near-copy candidate search still requires human review and is not claimed here.
@@ -42,10 +44,10 @@ The evaluation benchmark is sealed under the following SHA-256 checksums:
 
 | Artifact | Path | SHA-256 Checksum |
 |---|---|---|
-| Evidence Units | `annotations/evidence.jsonl` | `a1d201a437adffad3b7571ffdd3e21eea2b03f34d054f71ba71634afb32945f3` |
-| Occurrence Census | `annotations/occurrences.jsonl` | `95e028eb6318678f7049ca002c605bacc7af2719cc565805c0ca49ea6bef66f2` (updated 2026-09-13 for the +60-row exact-match completeness fix above) |
+| Evidence Units | `annotations/evidence.jsonl` | `2efff9113056a797614de940c28b3fe1f5aac301fdaf3250c8fc83978c88565b` |
+| Occurrence Census | `annotations/occurrences.jsonl` | `02542d8e78b640da45f05cc1376c92226c459c44cdcbc1f782e022b932ad0c9d` (updated 2026-09-13 for the +60-row exact-match completeness fix above) |
 | Split Allocation | `annotations/splits.json` | see `annotations/splits.json`'s own `checksums` block is self-referential and therefore not meaningful; pinned externally in `docs/PROJECT_STATUS.md`'s A11 changelog entry instead |
-| Adjudication Table | `annotations/adjudication.csv` | `b2686e4c7ddbd3bee32ca688076db36beb5f804c231df04be913785d9938c00c` (unchanged content; not previously pinned at all) |
+| Adjudication Table | `annotations/adjudication.csv` | `32c6778cbab6197755290bd8c5115380dd1dbbcedea2a5e28234437c3d5d2ebb` (unchanged content; not previously pinned at all) |
 
 **Correction (2026-09-13, Sam):** all hashes in this table are now the canonical SHA-256 of the actual committed git
 blob (`git show HEAD:<path> | sha256sum`), not a local working-tree read — see `audit/R04_ACCOUNTING_VERIFICATION.md`'s
@@ -106,13 +108,13 @@ To prevent data leakage during collector evaluation:
 
 | Metric | Development Split | Held-Out Split | Full Benchmark Total |
 |---|---|---|---|
-| **Title/Copy Groups** | 13 groups (52.0%) | 12 groups (48.0%) | **25 groups** |
-| **Page Episodes** | 37 episodes (52.1%) | 34 episodes (47.9%) | **71 episodes** |
-| **Individual Pages** | 28 pages | 22 pages | **50 pages** (revised 2026-09-12: 7 cross-title mirror pages, already referenced by occurrences.jsonl, were added to their groups' page catalogs — see correction note above and `audit/A11_INDEPENDENT_VERIFICATION.md`) |
-| **Evidence Propositions** | 34 propositions | 31 propositions | **65 propositions** |
-| **Critical Propositions** | 30 propositions | 27 propositions | **57 propositions** |
+| **Title/Copy Groups** | 14 groups (56.0%) | 11 groups (44.0%) | **25 groups** |
+| **Page Episodes** | 39 episodes (54.9%) | 32 episodes (45.1%) | **71 episodes** |
+| **Individual Pages** | 30 pages | 20 pages | **50 pages** (revised 2026-09-12: 7 cross-title mirror pages, already referenced by occurrences.jsonl, were added to their groups' page catalogs — see correction note above and `audit/A11_INDEPENDENT_VERIFICATION.md`) |
+| **Evidence Propositions** | 38 propositions | 27 propositions | **65 propositions** |
+| **Critical Propositions** | 34 propositions | 23 propositions | **57 propositions** |
 | **Non-Critical Controls** | 4 propositions | 4 propositions | **8 propositions** |
-| **Occurrence Records** | 777 occurrences | 644 occurrences | **1,421 occurrences** |
+| **Occurrence Records** | 808 occurrences | 613 occurrences | **1,421 occurrences** |
 
 **Correction (2026-09-13, Sam):** every number in this table except the totals column has been independently
 recomputed directly from `evidence.jsonl`/`occurrences.jsonl`/`splits.json` (not copied from an earlier draft). The

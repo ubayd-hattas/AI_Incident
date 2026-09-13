@@ -24,6 +24,16 @@ with open(rev_file, "r", encoding="utf-8") as f:
 
 all_pass = True
 
+CODECS = {"ascii": "ascii", "utf8": "utf-8", "latin1": "latin-1"}
+
+def canonical_text(revision: dict) -> str:
+    """E05: recover Latin-1-projected raw bytes before declared decoding."""
+    raw = revision["body"].encode("latin-1")
+    if hashlib.sha256(raw).hexdigest() != revision["body_sha256"]:
+        raise ValueError(f"raw body_sha256 does not reproduce for {revision['rev_id']}")
+    return raw.decode(CODECS[revision["body_encoding"]])
+
+
 print("\n--- 2. Verifying evidence.jsonl (65 propositions) ---")
 with open(ev_file, "r", encoding="utf-8") as f:
     evidence = [json.loads(line) for line in f if line.strip()]
@@ -39,7 +49,7 @@ for ev in evidence:
         all_pass = False
         continue
     rev = revs[rev_id]
-    body = rev["body"]
+    body = canonical_text(rev)
     # docs/E05_TYPED_LOADER.md: the raw JSON `body` string is ALWAYS a Latin-1
     # byte projection of the true source bytes, regardless of the declared
     # body_encoding classification -- branching on body_encoding here (as this
@@ -47,7 +57,7 @@ for ev in evidence:
     # source hash for any revision whose declared encoding isn't literally
     # "latin-1" but whose true bytes are non-ASCII (found independently:
     # PROP-20260617-17/-18 and 80 occurrence rows on the same page).
-    body_bytes = body.encode("latin-1")
+    body_bytes = rev["body"].encode("latin-1")
     b_hash = hashlib.sha256(body_bytes).hexdigest()
     hash_match = (b_hash == ev["source_body_hash"])
     if not hash_match:
@@ -57,6 +67,9 @@ for ev in evidence:
         all_pass = False
 
     spans_ok = True
+    if len(body) != ev["body_len"]:
+        print(f"LENGTH MISMATCH in {eid}: recorded {ev['body_len']}, canonical {len(body)}")
+        all_pass = False
     for s in ev["source_spans"]:
         start, end = s["start"], s["end"]
         actual = body[start:end]
@@ -82,11 +95,11 @@ for occ in occurrences:
         all_pass = False
         continue
     r = revs[rid]
-    body = r["body"]
+    body = canonical_text(r)
     # This check was previously entirely absent: occurrence body_sha256 was
     # never independently recomputed against the actual revision body here at
     # all -- only the char_span text was checked.
-    occ_hash = hashlib.sha256(body.encode("latin-1")).hexdigest()
+    occ_hash = hashlib.sha256(r["body"].encode("latin-1")).hexdigest()
     if occ_hash != occ.get("body_sha256"):
         print(f"OCC HASH MISMATCH: {occ['occurrence_id']} recorded {occ.get('body_sha256', '')[:12]}... recomputed {occ_hash[:12]}...")
         all_pass = False

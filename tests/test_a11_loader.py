@@ -37,13 +37,12 @@ class A11LoaderStructuralTests(unittest.TestCase):
         propositions, fragments = self.benchmark.propositions, self.benchmark.fragments_by_id
         validate_population(propositions, fragments)  # raises on any violation
 
-    def test_eligibility_wiring_matches_eligibility_jsonl(self) -> None:
-        propositions = self.benchmark.propositions
-        ineligible = [p.evidence_id for p in propositions if not p.eligible]
-        self.assertEqual(ineligible, ["PROP-20260618-63"])
-        prop = next(p for p in propositions if p.evidence_id == "PROP-20260618-63")
-        self.assertIsNotNone(prop.eligibility_reason)
-        self.assertIn("head-mismatch", prop.eligibility_reason)
+    def test_alternative_specific_eligibility_excludes_only_bad_anchor(self) -> None:
+        prop = next(p for p in self.benchmark.propositions if p.evidence_id == "PROP-20260618-63")
+        self.assertTrue(prop.eligible)
+        self.assertEqual(len(prop.core_alternatives), 1)
+        self.assertTrue(all("dse~AI@2" not in fragment_id for alt in prop.core_alternatives for fragment_id in alt))
+        self.assertTrue(all("dse~AgentSecCountyVarAI@1" in fragment_id for alt in prop.core_alternatives for fragment_id in alt))
 
     def test_multi_span_proposition_gets_one_fragment_per_span(self) -> None:
         propositions, fragments = self.benchmark.propositions, self.benchmark.fragments_by_id
@@ -78,10 +77,10 @@ class A11LoaderStructuralTests(unittest.TestCase):
 
     def test_frozen_split_and_denominator_properties(self) -> None:
         propositions = self.benchmark.propositions
-        self.assertEqual(sum(p.split == "dev" for p in propositions), 34)
-        self.assertEqual(sum(p.split == "held_out" for p in propositions), 31)
-        self.assertEqual(sum(p.eligible for p in propositions), 64)
-        self.assertEqual(sum(p.split == "held_out" and p.critical and p.eligible for p in propositions), 27)
+        self.assertEqual(sum(p.split == "dev" for p in propositions), 38)
+        self.assertEqual(sum(p.split == "held_out" for p in propositions), 27)
+        self.assertEqual(sum(p.eligible for p in propositions), 65)
+        self.assertEqual(sum(p.split == "held_out" and p.critical and p.eligible for p in propositions), 23)
 
     def test_occurrences_are_alternatives_not_evidence_units(self) -> None:
         prop = next(p for p in self.benchmark.propositions if p.evidence_id == "PROP-20260619-01")
@@ -113,19 +112,13 @@ class A11RawBodyEncodingTests(unittest.TestCase):
         self.assertEqual(_raw_body_bytes(projection), b"caf\xe9")
         self.assertEqual(_canonical_body_bytes(projection, "latin1"), "café".encode("utf-8"))
 
-    def test_real_frozen_files_expose_the_exact_known_hash_defects(self) -> None:
+    def test_real_frozen_files_have_no_encoding_provenance_defects(self) -> None:
         benchmark = load_a11_benchmark(fail_on_error=False)
-        evidence_mismatches = {
+        provenance_mismatches = {
             issue.message for issue in benchmark.validation.issues
-            if issue.code == "EVIDENCE_BODY_HASH_MISMATCH"
+            if issue.code in {"EVIDENCE_BODY_HASH_MISMATCH", "OCCURRENCE_BODY_HASH_MISMATCH"}
         }
-        occurrence_mismatches = {
-            issue.message for issue in benchmark.validation.issues
-            if issue.code == "OCCURRENCE_BODY_HASH_MISMATCH"
-        }
-        self.assertEqual(evidence_mismatches, {"PROP-20260617-17", "PROP-20260617-18"})
-        self.assertEqual(len(occurrence_mismatches), 80)
-        self.assertIn("OCC-PROP-20260617-17-001", occurrence_mismatches)
+        self.assertEqual(provenance_mismatches, set())
 
 
 if __name__ == "__main__":

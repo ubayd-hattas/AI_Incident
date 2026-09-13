@@ -28,6 +28,16 @@ ADJ_FILE = REPO / "annotations" / "adjudication.csv"
 
 FAILURES: list[str] = []
 
+CODECS = {"ascii": "ascii", "utf8": "utf-8", "latin1": "latin-1"}
+
+def canonical_text(revision: dict) -> str:
+    """E05: recover Latin-1-projected raw bytes before declared decoding."""
+    raw = revision["body"].encode("latin-1")
+    if hashlib.sha256(raw).hexdigest() != revision["body_sha256"]:
+        raise ValueError(f"raw body_sha256 does not reproduce for {revision['rev_id']}")
+    return raw.decode(CODECS[revision["body_encoding"]])
+
+
 
 def check(label: str, cond: bool, detail: str = "") -> None:
     status = "PASS" if cond else "FAIL"
@@ -69,7 +79,7 @@ for ev in evidence:
         ev_hash_fail += 1
         print(f"  FAIL {ev['evidence_id']}: rev_id {ev['rev_id']!r} not found in raw export")
         continue
-    body = rev["body"]
+    body = canonical_text(rev)
     # docs/E05_TYPED_LOADER.md: the raw `body` string is ALWAYS a Latin-1 byte
     # projection of the true source bytes regardless of declared body_encoding.
     # This branch previously compared against the literal "latin-1" (with a
@@ -77,11 +87,14 @@ for ev in evidence:
     # "latin1" without one) -- so it always silently took the wrong UTF-8
     # path. Confirmed real: 2 evidence + 80 occurrence hash mismatches found
     # independently against the true (always-latin-1) source bytes.
-    body_bytes = body.encode("latin-1")
+    body_bytes = rev["body"].encode("latin-1")
     real_hash = hashlib.sha256(body_bytes).hexdigest()
     if real_hash != ev["source_body_hash"]:
         ev_hash_fail += 1
         print(f"  FAIL {ev['evidence_id']}: hash mismatch (recomputed {real_hash[:12]}... vs recorded {ev['source_body_hash'][:12]}...)")
+    if len(body) != ev["body_len"]:
+        ev_span_fail += 1
+        print(f"  FAIL {ev['evidence_id']}: canonical body length mismatch")
     for span in ev["source_spans"]:
         if body[span["start"]:span["end"]] != span["quote"]:
             ev_span_fail += 1
@@ -114,8 +127,8 @@ for occ in occurrences:
     if rev is None or parent is None:
         occ_orphan += 1
         continue
-    body = rev["body"]
-    body_bytes = body.encode("latin-1")  # see the same fix/note above
+    body = canonical_text(rev)
+    body_bytes = rev["body"].encode("latin-1")  # source bytes, not canonical UTF-8
     real_hash = hashlib.sha256(body_bytes).hexdigest()
     if real_hash != occ["body_sha256"]:
         occ_hash_fail += 1
