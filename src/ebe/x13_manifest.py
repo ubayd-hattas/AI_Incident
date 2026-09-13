@@ -136,6 +136,17 @@ def _write_csv(path: Path, fieldnames: list[str], rows: Iterable[dict[str, Any]]
         writer.writeheader(); writer.writerows(rows)
 
 
+def _hashed_files(repo: Path, paths: Iterable[Path]) -> dict[str, str]:
+    return {
+        str(path.relative_to(repo)).replace("\\", "/"): sha256_file(path)
+        for path in paths
+    }
+
+
+def _aggregate_identity(values: dict[str, str]) -> str:
+    return hashlib.sha256(canonical_json(values)).hexdigest()
+
+
 def generate_manifest(repo: Path, *, mask_path: Path | None = None) -> dict[str, Any]:
     repo = repo.resolve()
     freeze = repo / "runs" / RUN_ROOT_NAME / "freeze"
@@ -146,12 +157,10 @@ def generate_manifest(repo: Path, *, mask_path: Path | None = None) -> dict[str,
         "A11_BENCHMARK_SPEC.md")
     benchmark_hashes = {name: sha256_file(repo / "annotations" / name) for name in annotation_names}
     source_files = [repo / "data/raw/export/events.jsonl", repo / "data/raw/export/revisions.jsonl"]
-    source_hashes = {str(p.relative_to(repo)).replace("\\", "/"): sha256_file(p) for p in source_files}
-    source_hash = hashlib.sha256(canonical_json(source_hashes)).hexdigest()
+    source_hashes = _hashed_files(repo, source_files)
+    source_hash = _aggregate_identity(source_hashes)
     accounting_files = sorted((repo / "tests/fixtures/accounting").glob("*.json"))
-    accounting_identity = hashlib.sha256(canonical_json({
-        str(p.relative_to(repo)).replace("\\", "/"): sha256_file(p)
-        for p in accounting_files})).hexdigest()
+    accounting_identity = _aggregate_identity(_hashed_files(repo, accounting_files))
     if mask_path is None:
         mask_path = freeze / "stable_support_intervals.jsonl"
     if not mask_path.exists():
@@ -196,7 +205,8 @@ def generate_manifest(repo: Path, *, mask_path: Path | None = None) -> dict[str,
 
 
 def validate_manifest(repo: Path) -> dict[str, Any]:
-    freeze = repo.resolve() / "runs" / RUN_ROOT_NAME / "freeze"
+    repo = repo.resolve()
+    freeze = repo / "runs" / RUN_ROOT_NAME / "freeze"
     manifest = json.loads((freeze / "run_manifest.json").read_text(encoding="utf-8"))
     if manifest["collection_row_count"] != 791 or manifest["stable_rescore_family_count"] != 61:
         raise ValueError("manifest row arithmetic is not frozen 791 + 61")
@@ -208,9 +218,31 @@ def validate_manifest(repo: Path) -> dict[str, Any]:
         raise ValueError("code state differs from frozen manifest")
     if manifest.get("mask_sha256") != sha256_file(freeze / "stable_support_intervals.jsonl"):
         raise ValueError("stable support mask hash mismatch")
+    if manifest.get("configuration_sha256") != sha256_file(freeze / "configuration_manifest.csv"):
+        raise ValueError("configuration manifest content hash mismatch")
+    if manifest.get("omitted_scope_sha256") != sha256_file(freeze / "omitted_scope.csv"):
+        raise ValueError("omitted scope content hash mismatch")
     for name, expected_hash in manifest.get("benchmark_hashes", {}).items():
-        if sha256_file(repo.resolve() / "annotations" / name) != expected_hash:
+        if sha256_file(repo / "annotations" / name) != expected_hash:
             raise ValueError(f"benchmark hash mismatch: {name}")
+    source_hashes = manifest.get("source_hashes")
+    if not isinstance(source_hashes, dict) or not source_hashes:
+        raise ValueError("manifest lacks frozen source hashes")
+    current_source_hashes: dict[str, str] = {}
+    for relative, expected_hash in source_hashes.items():
+        path = repo / relative
+        actual_hash = sha256_file(path)
+        if actual_hash != expected_hash:
+            raise ValueError(f"source hash mismatch: {relative}")
+        current_source_hashes[relative] = actual_hash
+    if manifest.get("source_hash") != _aggregate_identity(current_source_hashes):
+        raise ValueError("aggregate source identity mismatch")
+    accounting_files = sorted((repo / "tests/fixtures/accounting").glob("*.json"))
+    accounting_identity = _aggregate_identity(_hashed_files(repo, accounting_files))
+    if manifest.get("accounting_fixture_identity") != accounting_identity:
+        raise ValueError("accounting fixture identity mismatch")
+    if manifest.get("configuration_recipe_sha256") != sha256_file(repo / "configs/x13_deadline_v1.json"):
+        raise ValueError("configuration recipe hash mismatch")
     with (freeze / "configuration_manifest.csv").open(encoding="utf-8", newline="") as stream:
         if sum(1 for _ in csv.DictReader(stream)) != 791:
             raise ValueError("configuration manifest does not contain 791 rows")
