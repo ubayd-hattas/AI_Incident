@@ -217,4 +217,13 @@ Sam's **PASS**, with exact code/source/annotation/config/manifest hashes and zer
 - Structural `load_a11_benchmark()` only: valid; 65 propositions, 1,420 compiled core span fragments, nominal K23, 65 earliest support timestamps. No retained snapshot supplied and no coverage/delay evaluated.
 - No claim of current engineering or independent readiness PASS. The remaining work is precisely §4 and the two gates, not another list of annotation-methodology decisions.
 
+## 7. Addendum: Sam's independent spot-check of this consolidation (not Gate 2)
+
+**This is not `audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md` and does not constitute Gate 2 PASS.** Gate 2 is not yet due — §2's own "remaining concrete issues" and the full §4 checklist (observer/collector/E12 wiring, runner, manifest, reporting) are Gate 1 (Ubayd) work that has not happened yet. Recorded here only because §1 explicitly instructs "Sam must compare the final committed tree to all pins":
+
+- **All 10 canonical benchmark pins independently recomputed from scratch** (`git hash-object` for the blob OID, `git cat-file blob <oid> | sha256sum` for the canonical SHA-256, not read from the working tree) against the exact table in §1: 0 mismatches on either OID or hash, for all of `evidence.jsonl`, `occurrences.jsonl`, `eligibility.jsonl`, `splits.json`, `adjudication.csv`, `context_eligibility.jsonl`, `context_fragments.jsonl`, `context_occurrences.jsonl`, `rubric.md`, `A11_BENCHMARK_SPEC.md`.
+- **The PROP-20260616-61 three-way OR resolution independently re-verified**, not just read: all three new fragments' (`CTX-PROP-20260616-61-01/-02/-03`) `body_sha256` and `char_span` recomputed from `data/raw/export/revisions.jsonl` using `sha256(body.encode("latin-1"))` and the declared-codec decode, matching `context_fragments.jsonl` exactly. Combined with the 5 pre-existing fragments, all 8 body-grounded context fragments in the frozen benchmark pass this check with 0 failures.
+- Full project test suite: **152/152 pass** on this commit. `audit/verify_final_context.py` (Jaswin's own script, re-run as a cross-check, not sole evidence): reports 65 dispositions / 10 fragments / 101 occurrences, consistent with the independent recomputation above.
+- **Not checked in this spot-check**: anything in §2 (evaluator/loader integration), §3 (deadline matrix), or §4 (the full Gate 1 engineering checklist). This addendum covers only the frozen-annotation pins and the PROP-61 fix, because those are what changed since Sam's last independent check (`519743a`) and Alex's re-verification (`8495c1a`).
+
 ### READY FOR FINAL ENGINEERING PASS
