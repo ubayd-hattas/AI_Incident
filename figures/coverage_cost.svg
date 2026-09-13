@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="650" viewBox="0 0 1000 650">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text { font-family: Arial, Helvetica, sans-serif; }</style>
+<text x="110" y="72" font-size="25" font-weight="700" fill="#172554">Evidence coverage vs. request cost</text>
+<text x="110" y="96" font-size="14" fill="#475569">Schematic only: round-number illustrative positions; no X13 result.</text>
+<line x1="110" y1="550.0" x2="930" y2="550.0" stroke="#dbeafe"/>
+<text x="96" y="555.0" text-anchor="end" font-size="13" fill="#475569">0%</text>
+<line x1="110" y1="462.0" x2="930" y2="462.0" stroke="#dbeafe"/>
+<text x="96" y="467.0" text-anchor="end" font-size="13" fill="#475569">20%</text>
+<line x1="110" y1="374.0" x2="930" y2="374.0" stroke="#dbeafe"/>
+<text x="96" y="379.0" text-anchor="end" font-size="13" fill="#475569">40%</text>
+<line x1="110" y1="286.0" x2="930" y2="286.0" stroke="#dbeafe"/>
+<text x="96" y="291.0" text-anchor="end" font-size="13" fill="#475569">60%</text>
+<line x1="110" y1="198.0" x2="930" y2="198.0" stroke="#dbeafe"/>
+<text x="96" y="203.0" text-anchor="end" font-size="13" fill="#475569">80%</text>
+<line x1="110" y1="110.0" x2="930" y2="110.0" stroke="#dbeafe"/>
+<text x="96" y="115.0" text-anchor="end" font-size="13" fill="#475569">100%</text>
+<line x1="110.0" y1="110" x2="110.0" y2="550" stroke="#f1f5f9"/>
+<text x="110.0" y="574" text-anchor="middle" font-size="12" fill="#475569">0</text>
+<line x1="274.0" y1="110" x2="274.0" y2="550" stroke="#f1f5f9"/>
+<text x="274.0" y="574" text-anchor="middle" font-size="12" fill="#475569">72</text>
+<line x1="438.0" y1="110" x2="438.0" y2="550" stroke="#f1f5f9"/>
+<text x="438.0" y="574" text-anchor="middle" font-size="12" fill="#475569">144</text>
+<line x1="602.0" y1="110" x2="602.0" y2="550" stroke="#f1f5f9"/>
+<text x="602.0" y="574" text-anchor="middle" font-size="12" fill="#475569">216</text>
+<line x1="766.0" y1="110" x2="766.0" y2="550" stroke="#f1f5f9"/>
+<text x="766.0" y="574" text-anchor="middle" font-size="12" fill="#475569">288</text>
+<line x1="930.0" y1="110" x2="930.0" y2="550" stroke="#f1f5f9"/>
+<text x="930.0" y="574" text-anchor="middle" font-size="12" fill="#475569">360</text>
+<line x1="110" y1="550" x2="930" y2="550" stroke="#1e293b" stroke-width="2"/>
+<line x1="110" y1="110" x2="110" y2="550" stroke="#1e293b" stroke-width="2"/>
+<text x="520.0" y="602" text-anchor="middle" font-size="15" font-weight="700" fill="#1e293b">Requests (count)</text>
+<text x="30" y="330.0" text-anchor="middle" font-size="15" font-weight="700" fill="#1e293b" transform="rotate(-90 30 330.0)">Critical evidence coverage (0–100%)</text>
+<circle cx="201.11111111111111" cy="462.0" r="9" fill="#2563eb" stroke="#2563eb" stroke-width="3"/>
+<text x="214.11111111111111" y="452.0" font-size="12" font-weight="700" fill="#2563eb">final live</text>
+<circle cx="383.3333333333333" cy="374.0" r="9" fill="#ea580c" stroke="#ea580c" stroke-width="3"/>
+<text x="396.3333333333333" y="364.0" font-size="12" font-weight="700" fill="#ea580c">periodic 15m</text>
+<circle cx="565.5555555555555" cy="330.0" r="9" fill="#ffffff" stroke="#7c3aed" stroke-width="3"/>
+<text x="578.5555555555555" y="320.0" font-size="12" font-weight="700" fill="#7c3aed">periodic + feed (unmatched)</text>
+<circle cx="747.7777777777778" cy="242.0" r="9" fill="#059669" stroke="#059669" stroke-width="3"/>
+<text x="760.7777777777778" y="232.0" font-size="12" font-weight="700" fill="#059669">event queue</text>
+<circle cx="930.0" cy="154.0" r="9" fill="#ffffff" stroke="#be123c" stroke-width="3"/>
+<text x="943.0" y="144.0" font-size="12" font-weight="700" fill="#be123c">archive sensitivity (unmatched)</text>
+<rect x="122" y="496" width="340" height="38" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+<circle cx="142" cy="515" r="7" fill="#ffffff" stroke="#475569" stroke-width="2"/>
+<text x="158" y="520" font-size="12" fill="#334155">Hollow point = unmatched comparison</text>
+<text x="122" y="482" font-size="11" fill="#475569">No connecting lines. NA values are omitted, never shown as zero.</text>
+<rect x="0" y="0" width="1000" height="42" fill="#7f1d1d"/>
+<text x="500.0" y="28" text-anchor="middle" font-size="18" font-weight="700" fill="#ffffff">SYNTHETIC — pending X13 execution</text>
+<text x="500.0" y="325.0" text-anchor="middle" font-size="34" font-weight="700" fill="#991b1b" opacity="0.24" transform="rotate(-24 500.0 325.0)">SYNTHETIC — pending X13 execution</text>
+<text x="500.0" y="634" text-anchor="middle" font-size="14" font-weight="700" fill="#991b1b">SYNTHETIC — pending X13 execution</text>
+</svg>

@@ -5,3 +5,5 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
+docs/HANDOFF_P14_2026-09-13.md
+
