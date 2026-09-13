@@ -18,16 +18,19 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ebe.collectors import PeriodicConfig, PeriodicPolicy, run_periodic  # noqa: E402
 from ebe.evaluator import (  # noqa: E402
+    Benchmark,
     DenominatorFirewallError,
     Fragment,
     Proposition,
     RetainedBodyRecord,
     RetainedFeedRecord,
     RetainedSnapshot,
+    ValidationReport,
     compute_context_coverage,
     compute_core_coverage,
     compute_delay,
     core_covered,
+    evaluate_benchmark,
     validate_population,
 )
 from ebe.observer import Observer  # noqa: E402
@@ -188,6 +191,33 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         result = compute_core_coverage([prop], fragments, snapshot, critical_only=False)
         self.assertEqual((result.numerator, result.denominator), (1, 1))
 
+    def test_duplicate_occurrence_alternatives_do_not_multiply_proposition(self) -> None:
+        snapshot = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"claim", "h"),), ())
+        fragments = {"f": Fragment("f", "dse~A", "body_span", required_substring=b"claim")}
+        prop = Proposition("P1", True, (("f",), ("f",)))
+        result = compute_core_coverage([prop], fragments, snapshot, critical_only=False)
+        self.assertEqual((result.numerator, result.denominator), (1, 1))
+
+    def test_alternate_occurrence_satisfies_one_proposition(self) -> None:
+        snapshot = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~COPY", M(6), b"same claim", "copy"),), ())
+        fragments = {
+            "original": Fragment("original", "dse~ORIGINAL", "body_span", b"same claim", body_sha256="original"),
+            "copy": Fragment("copy", "dse~COPY", "body_span", b"same claim", body_sha256="copy"),
+        }
+        result = compute_core_coverage([Proposition("P1", True, (("original",), ("copy",)))], fragments, snapshot, critical_only=False)
+        self.assertEqual((result.numerator, result.denominator), (1, 1))
+
+    def test_incomplete_and_complete_multi_span_support(self) -> None:
+        fragments = {
+            "a": Fragment("a", "dse~A", "body_span", b"first"),
+            "b": Fragment("b", "dse~A", "body_span", b"second"),
+        }
+        prop = Proposition("P1", True, (("a", "b"),))
+        incomplete = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"first only", "x"),), ())
+        complete = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(3), b"first and second", "y"),), ())
+        self.assertEqual(compute_core_coverage([prop], fragments, incomplete, critical_only=False).numerator, 0)
+        self.assertEqual(compute_core_coverage([prop], fragments, complete, critical_only=False).numerator, 1)
+
     def test_context_only_requirement_independent_of_core(self) -> None:
         # Core is satisfied by a body fragment; context requires an observed
         # delete that is NOT present. By hand: core covered, context NOT covered.
@@ -255,6 +285,32 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         result_cov = compute_core_coverage([prop], fragments, snapshot, critical_only=False)
         self.assertEqual(result_cov.numerator, 0)  # by hand: must NOT be inflated by the evicted/never-admitted body
 
+    def test_rejected_oversize_body_never_counts(self) -> None:
+        export = build_export([Mut("save", "BIG", M(1), "OVERSIZE_SECRET" * 100, 1)])
+        result = run_periodic(Observer(export), PeriodicConfig(
+            PeriodicPolicy.PCD, interval_us=60_000_000, capacity_bytes=10, checkpoint=M(5),
+        ))
+        self.assertGreater(result.storage_snapshot.rejected_oversize_packets, 0)
+        snapshot = RetainedSnapshot.from_collector_result(result)
+        fragment = Fragment("f", "dse~BIG", "body_span", b"OVERSIZE_SECRET")
+        coverage = compute_core_coverage([Proposition("P1", True, (("f",),))], {"f": fragment}, snapshot, critical_only=False)
+        self.assertEqual(coverage.numerator, 0)
+
+    def test_body_evicted_by_later_capture_never_counts(self) -> None:
+        export = build_export([
+            Mut("save", "FIRST", M(1), "EVICTED_SECRET", 1),
+            Mut("save", "SECOND", M(2), "retained replacement", 1),
+        ])
+        result = run_periodic(Observer(export), PeriodicConfig(
+            PeriodicPolicy.PCD, interval_us=60_000_000, capacity_bytes=220, checkpoint=M(5),
+        ))
+        self.assertTrue(any(x.admission.evicted_request_seqs for x in result.capture_attempts))
+        snapshot = RetainedSnapshot.from_collector_result(result)
+        self.assertNotIn("dse~FIRST", {body.page_key for body in snapshot.bodies})
+        fragment = Fragment("f", "dse~FIRST", "body_span", b"EVICTED_SECRET")
+        coverage = compute_core_coverage([Proposition("P1", True, (("f",),))], {"f": fragment}, snapshot, critical_only=False)
+        self.assertEqual(coverage.numerator, 0)
+
     def test_na_unresolved_eligibility_excluded_from_numerator_and_denominator(self) -> None:
         snapshot = RetainedSnapshot(
             checkpoint=M(5),
@@ -279,6 +335,52 @@ class HandScoredAcceptanceTests(unittest.TestCase):
         self.assertEqual(result.denominator, 0)
         self.assertIsNone(result.percentage)  # NA, never a fabricated 0.0
         self.assertEqual(result.status, "NA_EMPTY_DENOMINATOR")
+
+    def test_context_not_frozen_is_na_not_zero_percent(self) -> None:
+        result = compute_context_coverage(
+            [Proposition("P1", True, (("f",),))],
+            {"f": Fragment("f", "dse~A", "body_span", b"x")},
+            RetainedSnapshot(M(5), (), ()), critical_only=False,
+        )
+        self.assertEqual(result.status, "NOT_FROZEN")
+        self.assertEqual(result.denominator, 0)
+        self.assertIsNone(result.percentage)
+
+    def test_split_filter_and_critical_denominator_are_annotation_driven(self) -> None:
+        fragments = {"f": Fragment("f", "dse~A", "body_span", b"claim")}
+        props = (
+            Proposition("DEV-C", True, (("f",),), split="dev", group_id="GD"),
+            Proposition("HELD-C", True, (("f",),), split="held_out", group_id="GH"),
+            Proposition("HELD-N", False, (("f",),), split="held_out", group_id="GH"),
+        )
+        benchmark = Benchmark(props, fragments, ValidationReport(3, 1, 3, ()))
+        snapshot = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"claim", "h"),), ())
+        result = evaluate_benchmark(benchmark, snapshot, split="held_out", metric="core", critical_only=True)
+        self.assertEqual((result.numerator, result.denominator), (1, 1))
+        self.assertEqual(result.covered_evidence_ids, ("HELD-C",))
+        self.assertEqual(result.excluded_evidence, (("HELD-N", "noncritical_filter"),))
+
+    def test_agent_report_status_is_preserved_without_affecting_scoring(self) -> None:
+        fragment = Fragment("f", "dse~A", "body_span", b"agent says it worked")
+        prop = Proposition("P1", True, (("f",),), claim_status="agent-reported action/result")
+        snapshot = RetainedSnapshot(M(5), (RetainedBodyRecord("dse~A", M(2), b"agent says it worked", "h"),), ())
+        self.assertEqual(compute_core_coverage([prop], {"f": fragment}, snapshot, critical_only=False).numerator, 1)
+        self.assertEqual(prop.claim_status, "agent-reported action/result")
+
+    def test_delay_chooses_earliest_completed_alternative(self) -> None:
+        fragments = {
+            "a1": Fragment("a1", "dse~A", "body_span", b"one"),
+            "a2": Fragment("a2", "dse~A", "body_span", b"two"),
+            "b": Fragment("b", "dse~B", "body_span", b"copy"),
+        }
+        prop = Proposition("P1", True, (("a1", "a2"), ("b",)), earliest_eligible_support=M(1))
+        snapshot = RetainedSnapshot(M(10), (
+            RetainedBodyRecord("dse~A", M(8), b"one two", "ha"),
+            RetainedBodyRecord("dse~B", M(4), b"copy", "hb"),
+        ), ())
+        result = compute_delay(prop, fragments, snapshot)
+        self.assertEqual(result.status, "retained")
+        self.assertEqual(result.delay_seconds, 180.0)
 
     def test_population_firewall_rejects_duplicate_evidence_id(self) -> None:
         # Both propositions have a valid, non-empty, resolvable core alternative,
