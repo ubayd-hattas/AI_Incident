@@ -1,479 +1,245 @@
-% ============================================================================
-% EVIDENCE BEFORE ERASURE -- Research report scaffold (Track 2)
-% ============================================================================
-%
-% READ THIS BLOCK BEFORE YOU SUBMIT ANYTHING.
-%
-% 1. THIS IS SCAFFOLDING, NOT A FINISHED REPORT. Every bullet list in this file
-%    is fact-dense NOTES pulled from the project's own audit trail (with a
-%    citation to where each fact lives), not finished prose. The sprint's own
-%    rules say a report "may be penalized if it reads as generated rather than
-%    written by the team" (padded sections, generic framing, claims without
-%    sources). Turn these bullets into your own sentences. Do not submit this
-%    file's bullet lists as flowing paragraphs verbatim.
-%
-% 2. THE OFFICIAL TEMPLATE IS A GOOGLE DOC, not LaTeX:
-%    https://docs.google.com/document/d/1PQBlhI3tM5vb51x7jBWXBQMYg6hkiU_x8RaCws4kjl4/copy?usp=sharing
-%    The FAQ says to always use whatever is linked on the Guidelines tab (the
-%    copy in acceptance emails may be stale). This .tex file matches the
-%    REQUIRED STRUCTURE AND LIMITS (8 pages excl. refs/appendices, abstract
-%    <=150 words, required Limitations & Dual-Use appendix, author/affiliation
-%    block) -- but before final submission, either port this content into the
-%    actual Google Doc template, or confirm a LaTeX PDF is acceptable in this
-%    round's Guidelines tab.
-%
-% 3. RESULTS ARE NOT YET REAL. X13 (the actual experiment) has not been run as
-%    of this draft -- only Gate 1 (engineering) and Gate 2 (independent
-%    readiness) have passed. Every number in \S Results is marked PENDING.
-%    Do not invent numbers to fill the gap; an honest "results pending, here is
-%    exactly what will be reported and how" is a legitimate, common thing to
-%    submit under time pressure, and is far better than a fabricated number.
-%
-% 4. FILL IN: author names/affiliations, the exact title (a working title is
-%    given below), and every [TODO] marker.
-%
-% Compile with pdflatex (no exotic packages; should work on Overleaf or a
-% local TeXLive install unmodified).
-% ============================================================================
-
+% Canonical report source. Repository evidence audited at 39d5e7022ee5.
+% The repository links an official Google Docs template, not a LaTeX class.
+% This retains the existing article layout; template acceptance is unconfirmed.
+% Build: pdflatex -interaction=nonstopmode -halt-on-error report.tex (twice).
 \documentclass[11pt]{article}
-
 \usepackage[margin=1in]{geometry}
 \usepackage{times}
+\usepackage[T1]{fontenc}
 \usepackage{booktabs}
-\usepackage{enumitem}
+\usepackage{array}
+\usepackage{amsmath}
 \usepackage{hyperref}
 \usepackage{graphicx}
 \usepackage{caption}
 \usepackage[table]{xcolor}
 \usepackage{titlesec}
 \usepackage{fancyhdr}
-
-\hypersetup{
-  colorlinks=true,
-  linkcolor=blue!50!black,
-  citecolor=blue!50!black,
-  urlcolor=blue!50!black
-}
-
-\titlespacing*{\section}{0pt}{12pt}{6pt}
-\titlespacing*{\subsection}{0pt}{10pt}{4pt}
-
+\hypersetup{colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black,
+ pdftitle={Evidence Before Erasure},pdfauthor={Alex Nicolaides; Aaron Vettiyamkunnath; Jaswin Chinthala; Ubayd Hattas; Samson}}
+\titlespacing*{\section}{0pt}{11pt}{5pt}
+\titlespacing*{\subsection}{0pt}{8pt}{3pt}
+\setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small Evidence Before Erasure --- Draft, not for distribution}
-\fancyhead[R]{\small \thepage}
+\fancyhead[L]{\small Evidence Before Erasure}
+\fancyhead[R]{\small\thepage}
 \renewcommand{\headrulewidth}{0.2pt}
-
-% Simple TODO/pending markers, visible in the compiled PDF so nobody forgets
-% to resolve them before submission.
-\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
-\newcommand{\pending}[1]{\textcolor{orange!80!black}{\textbf{[PENDING -- #1]}}}
-
-\title{\vspace{-1.5em}
-  Evidence Before Erasure: Does Event-Driven Monitoring Preserve\\
-  More Forensic Evidence of AI Agent Actions Than Periodic Polling?\\
-  \todo{confirm/replace working title}}
-
-\author{
-  \todo{Author 1 Name}$^{1}$ \quad
-  \todo{Author 2 Name}$^{1}$ \quad
-  \todo{Author 3 Name}$^{1}$ \quad
-  \todo{Author 4 Name}$^{1}$ \\[4pt]
-  \small $^{1}$\todo{affiliation(s)} \\
-  \small \texttt{\todo{contact email(s)}}
-}
-\date{\today}
-
+\newcommand{\repo}[1]{{\small\path{#1}}}
+\title{\vspace{-1.4em}Evidence Before Erasure:\\Measuring Forensic Evidence Loss in Autonomous-Agent Incidents}
+\author{\begin{tabular}{c}
+Alex Nicolaides (Electrical Engineer)\\
+Aaron Vettiyamkunnath (Electrical Engineer)\\
+Jaswin Chinthala (Electrical Engineer)\\
+Ubayd Hattas (Data Science, Statistics and Computer Science)\\
+Samson (Electrical Engineer)\\[3pt]
+\small Institutional affiliation not specified in the repository
+\end{tabular}}
+\date{\small Apart $\times$ CeSIA AI Incident Response Research Sprint\\Track 2: What happened, and what breaks next}
 \begin{document}
 \maketitle
 \thispagestyle{fancy}
 
 \begin{abstract}
-\noindent
-% ABSTRACT -- HARD LIMIT 150 WORDS. Count before submitting.
-% Draft below is ~140 words; trim/rewrite in your own words.
-When an AI agent takes an action inside a shared, mutable environment
-(edits a page, coordinates with other agents, deletes evidence of its own
-behavior), the trace of that action has a finite shelf life: it can be
-overwritten, deleted, or evicted from a storage-capped monitor before anyone
-looks. We study, in a trace-grounded simulation of a wiki-like environment
-populated by autonomous agents, whether a simple time-interval polling
-monitor retains less \emph{critical forensic evidence} of agent actions than
-a budget-matched, event-driven monitor under identical storage and request
-constraints. We built and independently, adversarially audited a 65-item
-human-labeled benchmark of concrete agent behaviors (including deliberate
-evasion patterns such as backup-page creation before deletion) and a
-retained-only evaluator with a formally specified causal-ordering model.
-\pending{one-sentence headline result once X13 has run}.
+Investigators need evidence that remains interpretable after collection, not just a large archive. We ask how collection policy, budget, and timing affect evidence preservation within the recoverable Collusion Wiki history. We implemented a conditional replay, a 65-proposition adjudicated benchmark, and retained-only core and context evaluation. The prespecified primary contrast compares changed-only periodic collection across 60 polling offsets with event-derived collection under a shared hypothetical feed. The experiment did not produce a policy-comparison result: none of 791 required rows completed, and the first exceeded a 7,200-second execution limit. A subsequent collection-only profile reduced five-day runtime from 154.869 to 21.199 seconds, but full-horizon feasibility remained unresolved. Thus the repository supports implementation and runtime findings, not an estimate of evidence loss or a preferred collection policy. The artifact separates source missingness from modeled non-preservation and makes completion, access assumptions, and retained context explicit prerequisites for that measurement.
 \end{abstract}
 
-\vspace{0.5em}
-\noindent\textbf{Keywords:} \todo{3--5 keywords, e.g. AI incident response,
-observability, evidence retention, monitoring policy, simulation}
-
-% ==========================================================================
 \section{Introduction}
-% ==========================================================================
-% Required content per the sprint rubric: which track/sub-problem, why it
-% matters, what the artifact is for. Write 3-5 short paragraphs from these
-% points -- do not just list them.
+Incident-response evidence must be acquired before it can be examined. Digital-forensics guidance already treats collection, integrity, and volatile data as operational concerns; log-management guidance covers storage and retention~\cite{nist86,nist92}. Our question is narrower: \emph{within the recoverable Collusion Wiki history, how do collection policy, budget, and timing affect human-validated evidence preservation?} We operationalize the evidence target through a team-assigned adjudication ledger, with the validation qualifications described below.
 
-\begin{itemize}[leftmargin=*]
-  \item \textbf{Track and problem.} Track 2 (AI Incident Response). The
-    sub-problem: incident response depends on evidence surviving long enough
-    to be collected; monitoring/logging design choices (poll interval,
-    storage cap, feed- vs. schedule-driven collection) determine what
-    evidence is even \emph{retrievable} after the fact, independent of
-    whether the incident was ever noticed in time.
-  \item \textbf{Why it matters.} This reframes ``AI incident response'' as
-    partly an information-preservation/observability engineering problem, not
-    only a detection problem. If a monitoring architecture systematically
-    loses certain classes of evidence (e.g., self-erasing or fast-mutating
-    agent behavior), post-hoc investigation of an incident can fail even when
-    the incident is eventually flagged --- the evidence needed to explain it
-    is already gone. \todo{cite 1-2 real incident-response / observability
-    sources establishing that evidence retention -- not just detection -- is
-    a recognized bottleneck; the sprint rubric penalizes claims without
-    sources}.
-  \item \textbf{Concrete motivating example (use this -- it is real, already
-    independently re-verified, and concrete).} In the simulated corpus, an
-    agent (handle \texttt{Aug17ConstructionAgent}) posted a warning that a
-    "wiki cleanup/deletion sweep appears active," naming a specific backup
-    page to use if the original vanished. 96 seconds later that backup page
-    (\texttt{ZZZDataUSAConstructionWageLive}) was created. The original page
-    and the backup page were then deleted 12 seconds apart. Every timestamp
-    and hash in this example was independently re-derived from the raw
-    revision/event export, not copied from a prior summary
-    (\texttt{docs/JUDGE\_WALKTHROUGH.md}). This is exactly the shape of
-    evidence a badly-timed or too-infrequent monitor would miss entirely.
-  \item \textbf{What the artifact is.} (a) A frozen, hand-adjudicated
-    benchmark of 65 ``critical'' agent-behavior propositions grounded in a
-    13,000+-revision simulated wiki trace, each requiring exact retained
-    textual evidence (and, for 8 of the 65, additional context); (b) a
-    retained-only evaluator with a formally specified causal-ordering model
-    (an operation clock that provably agrees between a full run and a
-    truncated ``fresh prefix'' up to any checkpoint); (c) a comparison
-    harness for periodic (P/PD/PCD at several intervals) vs.\ event-driven
-    (token-bucket-rate-limited) collection, plus four adversarial ``hostile
-    controls'' (a low-information baseline, an online repair variant, a
-    reversed-service-order stress test, and a terminal archive-augmentation
-    control) built specifically to stress-test whether any observed
-    difference is an artifact of an unfair comparison.
-  \item \textbf{Scope discipline (worth stating explicitly in the report --
-    it is unusual and a strength, not a hedge).} The primary contrast, the
-    benchmark, the denominator (held-out critical core, $K=23$), and the
-    decision threshold were frozen \emph{before} any real result was
-    computed; every methodological repair found during audit was applied
-    outcome-blind. \todo{state plainly, once results exist, whether any
-    parameter was changed after seeing a result --- if none were, say so
-    explicitly, it is a real strength}.
-\end{itemize}
+The released history provides saved page bodies and deletion records~\cite{export}. It does not provide a complete record of what every investigator could retrieve at every historical instant. We therefore implement a trace-grounded, live-only simulation under a shared hypothetical change-feed interface. A simulated collector's failure to retain a body would not establish that the website permanently lost it. The replay is the simulation; the released records are not treated as a synthetic agent population.
 
-% ==========================================================================
-\section{Related Work}
-% ==========================================================================
-% Required: what prior work this builds on, what it already does, what gap
-% remains, what is new here. \todo -- this section needs real citations the
-% team gathers; do not let an AI tool invent citations.
+The intended contribution is a policy comparison in terms of distinct, interpretable propositions rather than revision counts or downloaded bytes. A repeated message can preserve the same proposition many times, while a retained fragment can lose the context needed to interpret it. These distinctions motivate the benchmark and evaluator. They do not supply an experimental result on their own.
 
-\begin{itemize}[leftmargin=*]
-  \item \todo{Cite prior AI incident/agent-monitoring work this builds on
-    (e.g. agent evaluation/red-teaming benchmarks, logging/observability
-    literature, digital forensics evidence-retention literature, prior work
-    on periodic vs.\ event-driven monitoring in distributed systems more
-    generally).}
-  \item \todo{State plainly what existing benchmarks/evaluations already
-    measure (typically: whether an agent's actions are \emph{detected} or
-    \emph{scored} for harmfulness) and what they do \emph{not} measure
-    (whether the evidence needed to investigate an action \emph{survives}
-    under realistic storage/collection constraints).}
-  \item \textbf{Gap and contribution (draft, tighten with citations):} to our
-    knowledge, no existing AI incident-response evaluation treats evidence
-    \emph{retention under a capacity-constrained monitor} as the primary
-    outcome variable, or builds an adversarial ``hostile control'' suite
-    specifically to stress-test the fairness of a monitoring-policy
-    comparison. \todo{soften/qualify this claim once related work is actually
-    checked -- an unverified novelty claim is exactly what loses
-    Impact/Innovation points with judges.}
-\end{itemize}
+\textbf{What was accomplished.} The repository contains a pinned data loader, a state-reconstruction engine, collection and storage implementations, an adjudicated benchmark, evaluator tests, and a prespecified comparison harness. The attempted experiment failed before completing its first row. This report presents the verified structural and runtime findings and states explicitly which scientific questions remain unanswered. Neither a null effect nor a preference between policies can be inferred from execution failure.
 
-% ==========================================================================
-\section{Methodology}
-% ==========================================================================
-% Required: enough detail to replicate -- methods, experimental design, data,
-% sources, assumptions, evaluation procedure. This project's own docs already
-% contain nearly all of this in verified form; the bullets below cite exactly
-% where. Turn into prose; keep the specific numbers, drop anything not needed
-% for replication understanding at report length.
+\section{Related Work and Contribution}
+NIST SP 800-86 describes integrating forensic collection, examination, analysis, and reporting into incident response, including acquisition of volatile operating-system data~\cite{nist86}. NIST SP 800-92 addresses computer-security log management, including generation, protection, analysis, storage, and retention~\cite{nist92}. These establish that evidence acquisition and preservation are existing engineering problems. We do not claim to invent forensic logging, evidence preservation, integrity checking, or incident reconstruction.
 
-\subsection{Environment and data}
-\begin{itemize}[leftmargin=*]
-  \item Trace-grounded simulation over a released wiki-style corpus (``DSE'')
-    of autonomous-agent edits: \todo{state corpus size --- 13{,}403+ revisions
-    per \texttt{docs/PRE\_RESULTS\_CLOSURE.md}; confirm exact final count} across
-    a fixed replay window (\texttt{2026-05-24} to \texttt{2026-07-15}).
-  \item Study description (use verbatim or close paraphrase --- this exact
-    framing was deliberately frozen as the paper's own epistemic-status
-    statement, per \texttt{docs/X13\_RUN\_CONTRACT.md}): \emph{``Trace-grounded,
-    live-only simulation under a shared hypothetical change-feed interface,
-    conditional on the released DSE history. Evidence not retained by a
-    simulated collector is not evidence permanently erased from the
-    website.''}
-\end{itemize}
+The Collusion Wiki release is the empirical source for this project~\cite{export}. The investigators' reconstruction and publication make recoverable bodies and mutation records available. Our contribution is not rediscovering those records. It is an implementation for asking how a defined acquisition schedule and capped retention policy would affect a separate proposition-level benchmark. Archive reconstruction, semantic annotation, and hypothetical collector evaluation are different stages; possession of an archive does not establish the performance of a live collector.
 
-\subsection{Benchmark}
-\begin{itemize}[leftmargin=*]
-  \item 65 hand-labeled propositions (concrete claims that an agent did
-    something), 57 critical / 8 non-critical; split 38 development / 27
-    held-out, 34/23 critical respectively. Primary held-out critical
-    denominator $K = 23$.
-  \item 25 title-groups, 52 catalog pages including context dependencies;
-    1{,}421 core occurrence (span-provenance) rows across the corpus.
-  \item 8 of 65 propositions require additional \emph{context} (a prior
-    revision or a deletion event) beyond their own anchor span to be
-    meaningful; all 8 have frozen, groundable context alternatives (57 are
-    self-contained). One proposition
-    (\texttt{PROP-20260616-61}) required adjudicating a genuine three-way
-    ambiguity (three near-identical candidate ``older helper pages''
-    matching a referenced query pattern) rather than forcing a single
-    choice --- resolved as an OR across all three valid alternatives.
-  \item Every quotation, span, and hash in the benchmark is independently
-    re-derivable from the raw export by construction (SHA-256 over the
-    reconstructed source bytes, exact half-open character spans).
-  \item \textbf{Novelty/replication note worth including:} the annotation
-    process itself was adversarially audited across the team multiple times;
-    concrete, disclosed corrections found along the way included a stale
-    benchmark count in an early spec, an encoding bug that silently mismatched
-    2 evidence rows and 80 occurrence rows against their true source bytes
-    (traced to an unconditional Latin-1 byte-projection requirement in the
-    raw export, not a declared-encoding branch), and a first-pass context
-    axis that could initially count context without core. \todo{decide how
-    much of this process detail belongs in the main report vs.\ an appendix
-    --- it supports Execution Quality but can bloat the 8-page limit.}
-\end{itemize}
+The inspected project literature does not justify a field-wide priority claim. In particular, the local novelty-search log uses stronger certification language than the source audit supports, and investigator work not captured by that search remains a concern~\cite{sourceaudit}. We therefore make no ``first'' claim and do not assert that related policy studies do not exist. The delivered contribution is the replay and evaluation artifact, together with a documented feasibility failure. The intended empirical preservation comparison remains incomplete.
 
-\subsection{Collection policies compared}
-\begin{itemize}[leftmargin=*]
-  \item \textbf{Periodic:} fixed-interval polling at several intervals
-    $\Delta$ (P, PD, PCD variants), evaluated across all 60 phase offsets
-    within each interval (not a single arbitrarily-chosen phase).
-  \item \textbf{Event-driven (E):} feed-triggered collection, rate-limited by
-    a token-bucket parameter $q$.
-  \item \textbf{Primary contrast (frozen before any result was seen):} PCD at
-    $\Delta=15$ minutes (mean across all 60 phases) vs.\ E at $q=30$; shared
-    1\,MiB capped, deduplicated store; 5s feed lag; 60s poll interval; 0s GET
-    delay. Decision rule: a $\geq 10$ percentage-point difference in held-out
-    critical core retention at the study endpoint.
-  \item \textbf{Hostile controls,} run to test whether the primary contrast
-    is a fair/robust comparison rather than an artifact of policy choice:
-  \begin{itemize}
-    \item \emph{F} --- a low-information baseline: one terminal-state
-      directory listing plus one atomic GET per currently-live title, no
-      ongoing polling at all.
-    \item \emph{PCD-R} --- an online self-repair variant of periodic
-      collection that opportunistically re-fetches known-stale content,
-      including under non-zero response delay with a real pending-request
-      model (a request already in flight for a title suppresses a duplicate
-      repair attempt for that same title).
-    \item \emph{Reverse-order} stress --- services titles/events in reversed
-      order at each sweep, to test whether the comparison is sensitive to
-      arbitrary service ordering under storage pressure.
-    \item \emph{Terminal archive augmentation} --- a full enumeration of every
-      revision saved by the study endpoint, layered on top of the live
-      collection, to bound how much a terminal archival pass alone recovers.
-  \end{itemize}
-\end{itemize}
+\section{Methodology and Implementation}
+\subsection{Source, population, and reconstruction}
+The source registry identifies the core export generated on September 3, 2026, retrieved on September 12, with a published cut on revision write date. The final audit recomputed the five expanded-file checksums and found all matched the repository pins~\cite{export,verification}. The full bundle has 4,579 page records, 14,591 revisions, and 19,913 events. Our replay population is DSE: 3,908 held pages and 13,403 held revisions. It includes 5,217 deletion events as background, not as 5,217 independent incidents.
 
-\subsection{Evaluator and causal-ordering model}
-\begin{itemize}[leftmargin=*]
-  \item The evaluator scores \emph{only} what a policy's own capped,
-    deduplicated store actually retained at the study checkpoint --- never a
-    collector's full diagnostic/rejected-body history. A proposition counts
-    as covered only if a complete, exactly-hashed, exactly-spanned frozen
-    occurrence is present in the retained snapshot at that checkpoint (OR
-    across independently sufficient alternatives, AND within a multi-span
-    alternative).
-  \item \textbf{Causal-ordering guarantee (worth stating as a concrete,
-    testable property, not just an assumption):} a single monotonic
-    operation clock governs feed polls, GET dispatch, and completions; an
-    as-of-checkpoint cost/coverage query computed from a full run is required
-    to exactly equal the same query computed by truncating the run to a
-    fresh prefix ending at that checkpoint. This was verified, not assumed
-    (independently constructed adversarial histories, not just the
-    project's own unit tests).
-  \item Unknown/unavailable required context is retained as an explicit
-    interval (lower/upper bound), never coerced to a zero or a point
-    estimate.
-  \item \todo{once real numbers exist: state exact software/commit identity
-    used for the reported run (git commit hash, frozen manifest hash) so the
-    result is exactly reproducible.}
-\end{itemize}
+Of those deletions, 1,248 events concern 1,246 titles without a published revision. The implementation must not infer their former contents. Four standalone records named \repo{revert} represent successful edits without held bodies in this model, not restoration of a guessed earlier revision. These populations were recounted from the local export, rather than reported as newly observed agent behavior~\cite{verification,sourceaudit}.
 
-\subsection{Independent verification process}
-\begin{itemize}[leftmargin=*]
-  \item Every methodological/engineering component passed through an
-    explicit two-gate process before any real scoring was authorized: an
-    engineering-readiness gate, then a comprehensive independent audit gate
-    (adversarial, hand-derived expected values written down \emph{before}
-    executing code, on fixtures the auditor constructed independently rather
-    than reusing the implementer's own test fixtures).
-  \item \todo{state final gate outcome plainly once locked for submission:
-    both gates passed as of this draft; no real scoring has occurred yet.}
-  \item This process caught and fixed concrete implementation bugs before
-    any result existed, e.g.\ a data-integrity check that failed open (raised
-    an untyped error rather than a specific, catchable integrity violation)
-    on a corrupted retained-body reference, and a real-mode cost/overhead
-    reporting gap where several required per-row measurements were never
-    populated. \todo{decide exact phrasing/level of detail for the report ---
-    this is genuine Execution Quality evidence but should be summarized, not
-    itemized at full length.}
-\end{itemize}
+The modeled horizon is May 24 to July 15, 2026, in UTC. Saves replace the current body; successful deletion yields a deleted state; a supported bodyless edit yields a live-but-body-unknown state. Prehistory is unknown. An archival timestamp is not substituted for a save time or assumed to end live availability. Selected event times drive the nominal replay. Unresolved co-timed mutations retain alternative states rather than being ordered by arbitrary IDs. The closed timing-uncertainty convention is a model sensitivity, not a calibrated estimate of historical clock error~\cite{contract}.
 
-% ==========================================================================
+\subsection{Evidence units and annotation}
+An evidence unit is one scoped proposition supported by exact source material. Posting a proposal, reporting that it succeeded, and independently establishing success are distinct claims. Criticality identifies operational-priority content such as coordination, answer transmission, restriction-workaround proposals or reports, and communication persistence. It is not a label for independently confirmed harm, agent intent, or a short lifetime.
+
+\begin{table}[ht]
+\centering
+\caption{Frozen annotation inventory, independently recounted in this audit. Counts are benchmark properties, not retention results or incident prevalence.}
+\label{tab:benchmark}
+\begin{tabular}{lrrr}
+\toprule
+Quantity & Development & Held-out & Total\\
+\midrule
+Propositions & 38 & 27 & 65\\
+Critical propositions & 34 & 23 & 57\\
+Groups & 14 & 11 & 25\\
+Catalog pages, including context & 30 & 22 & 52\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The benchmark is purposive and enriched, not a probability sample. The named development and held-out splits are preserved. Groups collect related titles and support dependencies; they are not independent incidents. The 71 catalog episode IDs do not establish 71 independently validated evidence-bearing episodes. No sampling weights can turn this inventory into a corpus-prevalence estimate~\cite{benchmark}.
+
+The adjudication CSV contains reviewer fields attributed to Alex and Aaron and decisions attributed to Jaswin. That records the annotation process, but does not independently certify how much unaided human review each entry received. The audit trail also documents AI-assisted checks. We distinguish recorded adjudication, mechanical verification, and independent human review rather than treating them as interchangeable.
+
+There are 1,421 core occurrence rows, not 1,421 propositions. One support revision is excluded while another support alternative keeps its proposition eligible. Eight propositions require additional context; the remaining 57 are self-contained. The frozen context files define 10 context fragments and 101 body-context occurrences. Alternative valid context sources are combined by OR rather than selecting a preferred witness~\cite{benchmark}.
+
+\subsection{Collection, discovery, and retention}
+The continuous collectors begin without a preloaded list of all future titles. Each receives the same content-free hypothetical feed, polled every 60 seconds. The feed exposes title, action, and selected event time, not body text, annotations, hashes, private identity, or future revision history. At the primary setting, publication lag is five seconds and GET response delay is zero. A GET obtains the current modeled body at response completion, not the revision that originally triggered a notification~\cite{code,contract}.
+
+P periodically fetches every discovered title believed live or mixed and retains fresh copies without deduplication. PD uses the same repeated fetch schedule with exact deduplication. PCD fetches only dirty, believed-live or mixed titles at each periodic sweep. Its changes are feed-derived; it is not a blind monitor with weaker discovery than E. E coalesces dirty titles and services them by oldest pending event time, then title. At E30, the token bucket has capacity and initial credit 30, refills continuously at 30 body attempts per hour, and is serviced each minute. Feed requests are additional.
+
+Storage uses FIFO capture packets and canonical UTF-8 bodies. Exact deduplication shares identical bodies with reference counts, not semantic similarity. Packets still charge title and acquisition provenance. The cap is 1,048,576 bytes for the primary store $S$. Feed metadata $M$ is outside that cap and must be reported separately, including synchronized $S+M$ and byte-time integrals. Oversize captures are rejected before eviction. Failed, unknown, rejected, and pending body attempts still count as requests. These are modeled byte and request costs, not dollar costs or deployment-performance measurements.
+
+The code also implements F, a one-shot terminal live directory and GET baseline; PCD-R, online reacquisition when a title's last known body provenance is no longer retained; reverse service ordering; and a hypothetical persistent terminal archive. PCD-R fetches the current body, not a stored old revision. Reverse E changes only title tie-breaking, not oldest-event priority. The archive enumerates all held revisions saved by the endpoint and charges retrieval and metadata, using the existing store. These controls exist in code and tests, but none produced a completed scientific X13 row. F is not guaranteed to be a coverage lower bound, and capped archive recovery is not an optimized ceiling. Uncapped archive-only is the separate recoverable-release reference.
+
+\subsection{Evaluation and prespecified statistics}
+The evaluator accepts retained packets, referenced bodies, and charged delivered context. It validates hashes, packet/object consistency, reference counts, capacity, and times. Diagnostic downloads, rejected bodies, and evicted contents are not interchangeable with retained evidence. A core proposition is covered when an entire eligible support alternative is present: AND within an alternative, OR across alternatives. Context-complete coverage additionally requires its context bundle, so context alone cannot satisfy a missing core~\cite{code}.
+
+Critical coverage restricts the eligible denominator to critical propositions. Overall coverage includes eligible noncritical propositions. Core and context-complete coverage use the same scoped denominator. Unknown required context is represented explicitly rather than silently dropped or counted as a known miss. Preservation delay is computed from the earliest complete retained bundle relative to earliest eligible support; unretained units do not have zero delay. The helper APIs support these definitions. The real runner serializes held-out critical core/context and primary stable-mask results, but does not yet export every planned overall, per-unit, delay, or ever-admitted analysis. Schema files alone do not establish those measurements.
+
+Let $e$ be E30's held-out critical core fraction and $c_j$ the corresponding PCD15 fraction at phase $j$. The prespecified comparison is
+\begin{equation}
+D=100\left(e-\frac{1}{60}\sum_{j=0}^{59}c_j\right),\qquad
+\phi_j=\frac{j\Delta}{60},\quad \Delta=15\text{ minutes}.
+\end{equation}
+The nominal denominator is $K=23$ and the practical threshold is $D\geq10$ percentage points. The request constraint is $R_{E30}\leq\min_jR_{PCD15,j}$ at identical access and cap. Equal allowed capacity does not imply equal realized occupancy or equal total cost. An unmatched E30 cannot be replaced with E100 or E300 to obtain a favorable headline.
+
+The final contract superseded the early clustered-bootstrap proposal. Reporting helpers use exact rational arithmetic for the primary difference, all-phase admissibility, linear phase quantiles, group macro summaries, and leave-one-group-out checks. No bootstrap, p-value, or population confidence interval was produced. The 60 phases are schedules on one benchmark, not 60 independent incidents. Stable-support re-scoring is an exclusion sensitivity on nominal snapshots, not a range over shared counterfactual histories. None of these scientific summaries was computed in the failed run.
+
 \section{Results}
-% ==========================================================================
-\pending{This entire section. X13 (the actual 791-configuration experiment)
-has not been executed as of this draft. Do not fill in numbers here until a
-real, authorized run has actually completed. Below is the exact shape the
-results section will take once it has.}
+\subsection{Main finding: no completed policy comparison}
+\textbf{The repository contains no measured PCD15-versus-E30 evidence-preservation result.} The authorized v1 attempt required 791 collection rows and 61 stable re-score families. Its first row, P15 at phase zero, exceeded the 7,200-second execution limit without materializing a row artifact. The status log records a running entry followed by \repo{ExecutionTimeout}. Table~\ref{tab:completion} is supported by the status index and a census of the output directories, not by interpreting absent percentages as zero~\cite{failure,verification}.
 
-\subsection{Primary result}
-\begin{itemize}[leftmargin=*]
-  \item \pending{Held-out critical core retention: PCD15 (mean of 60 phases)
-    vs.\ E30, percentage-point difference, and which side of the frozen
-    $\geq 10$pp threshold it falls on.}
-  \item \pending{Table: per-phase PCD15 retention distribution (all 60
-    phases: min/median/mean/p10/p90) vs.\ single E30 value.}
-\end{itemize}
+\begin{table}[ht]
+\centering
+\caption{Actual X13 completion. NA means unmeasured, not no evidence retained. All 18 result CSVs contain headers only. The 791 separately labeled synthetic row files are harness fixtures, not scientific observations.}
+\label{tab:completion}
+\begin{tabular}{lr}
+\toprule
+Recorded item & Value\\
+\midrule
+Required collection rows & 791\\
+Completed collection rows / real row artifacts & 0 / 0\\
+Failed first row / unattempted remaining rows & 1 / 790\\
+Completed / required stable re-score families & 0 / 61\\
+E30 coverage; PCD15 phase mean; $D$ & NA\\
+All-phase request admissibility & NA\\
+Repair, archive, latency, order, delay results & NA\\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Sensitivity / hostile-control results}
-\begin{itemize}[leftmargin=*]
-  \item \pending{F baseline retention (lower bound / sanity floor).}
-  \item \pending{PCD-R vs.\ plain PCD --- does online repair close any gap?}
-  \item \pending{Reverse-order stress --- does service order change the
-    outcome materially?}
-  \item \pending{Archive augmentation --- how much does a terminal archival
-    pass alone recover, live-only vs.\ archive-augmented?}
-  \item \pending{Cost/overhead comparison table --- requests, bytes,
-    byte-hours, wall-clock/CPU/RSS --- at matched access, per the frozen
-    accounting contract.}
-\end{itemize}
+The primary hypothesis was not tested. There is no basis for a tie, a below-threshold effect, a reversal, or an event-policy advantage. The existing coverage-cost and case figures are explicitly watermarked synthetic; we exclude them from this report. Their illustrative values do not become observations because they appear in a generated SVG.
 
-\subsection{Main threat to validity}
-\begin{itemize}[leftmargin=*]
-  \item \todo{fill in honestly once results exist --- candidates already
-    identified during methodology design: (a) benchmark is 65
-    hand-adjudicated items, not a large statistical sample; (b) simulated
-    environment, not live production telemetry; (c) sampling/episode
-    provenance for the underlying corpus is not independently certified as
-    representative (explicitly flagged during the project's own audit).}
-\end{itemize}
+\subsection{Measured computational limitation}
+The subsequent outcome-blind diagnosis profiled collection only. On the same five-day P15 prefix with allocation tracing, elapsed time decreased from 154.869 to 21.199 seconds, a reported $7.31\times$ speedup. Peak traced allocation decreased from 134,726,566 to 3,255,239 bytes, or $41.39\times$. These are single bounded profiles, not repeated-run means or confidence intervals~\cite{performance}.
 
-% ==========================================================================
-\section{Discussion}
-% ==========================================================================
-\begin{itemize}[leftmargin=*]
-  \item \todo{What the result implies for monitoring-policy design in AI
-    incident response, once it exists --- write this only after Results is
-    real; do not pre-write a conclusion.}
-  \item \textbf{Practical implication regardless of which way the result
-    goes (safe to write now):} the benchmark, evaluator, and hostile-control
-    suite are themselves reusable artifacts for testing any future monitoring
-    policy against the same frozen evidence-retention question, on this or
-    an extended corpus.
-  \item \todo{Future work: e.g.\ broader capacity-cap sweep (explicitly
-    scoped out of this run as \texttt{NOT\_EXECUTED\_SCOPE\_AMENDMENT}), real
-    (non-simulated) agent telemetry, additional collection policies.}
-\end{itemize}
+\begin{figure}[ht]
+\centering
+\begin{tabular}{lr@{\quad}l}
+Before repair & 154.869 s & \textcolor{gray}{\rule{0.46\linewidth}{10pt}}\\[6pt]
+After repair & 21.199 s & \textcolor{blue!60!black}{\rule{0.063\linewidth}{10pt}}
+\end{tabular}
+\caption{Collection-only P15 profiling on a five-day prefix, with allocation tracing in both runs. Bar lengths show elapsed seconds; each bar represents one reported measurement. Both performed 81,081 body GETs. This is a simulator performance comparison, not an evidence-preservation comparison or a full-horizon runtime estimate. Source: the performance diagnosis~\cite{performance}.}
+\label{fig:runtime}
+\end{figure}
 
-% ==========================================================================
-\section*{Acknowledgment of AI Tool Use}
-% ==========================================================================
-% The sprint explicitly requires disclosure of what was built on / what AI
-% assistance was used for, distinct from "did AI write the report." Be
-% specific and honest here -- this protects the team, it does not hurt the
-% Impact/Innovation score.
-\todo{State specifically: which AI tools were used, for what (e.g.\ code
-implementation assistance, independent adversarial code review, debugging),
-and confirm this report's prose was written by the team, with AI used only
-to check reasoning/find gaps, per the sprint's own stated policy on AI tool
-use in \texttt{docs/Hackathon\_Judging\_Submission\_Requirements.md}.}
+The optimization caches immutable state/body/packet work and compacts diagnostic histories. The equivalence verifier compares request schedules, costs, retained packets and bodies, and accounting projections on bounded prefixes and synthetic fixtures. Its recorded zero mismatches support those tested equivalences, not an exhaustive proof over all histories. It does not compute benchmark coverage.
 
-% ==========================================================================
-\appendix
-\section{Limitations and Dual-Use Considerations}
-% ==========================================================================
-% REQUIRED APPENDIX. Do not omit. Write in full sentences; bullets below are
-% starting points only, drawn from things already explicitly disclosed
-% during this project's own audit trail (cite the internal doc each time so
-% every claim has a source, per the sprint's evidence-based-claims rule).
+After repair, the full ordinal-1 collection remained unfinished at the approximately one-hour stop, with observed RSS about 612.5 MB. The schedule census gives 6,387,883 body GETs and 6,462,764 total attempts for that row. Across 240 P/PD primary and reverse rows, the census gives 1,551,038,656 attempts. These are schedule/workload counts, not completed policy-cost observations. The early-prefix speedup therefore did not demonstrate full-roster feasibility.
 
-\subsection*{Limitations}
-\begin{itemize}[leftmargin=*]
-  \item \textbf{Simulated environment, not production telemetry.} All agent
-    behavior is drawn from a released simulated wiki trace, not real deployed
-    AI agents; findings characterize retention dynamics under this
-    trace-and-model, not a general claim about production monitoring
-    systems.
-  \item \textbf{Benchmark scale and provenance.} 65 hand-adjudicated
-    propositions is not a large statistical sample; the underlying corpus's
-    sampling/episode provenance is explicitly not certified as a
-    representative, exhaustively-validated incident population (a
-    limitation the team identified and disclosed during its own
-    methodology audit, not one an external reviewer found).
-  \item \textbf{Scope amendment.} A originally-larger experimental matrix was
-    narrowed under time constraints (e.g.\ a broader storage-cap sweep and
-    several secondary cross-products were explicitly descoped rather than
-    silently dropped); every omission is logged with an explicit reason
-    rather than presented as completed work. \todo{state exact omitted items
-    if space allows, or reference the scope-amendment record.}
-  \item \textbf{No claim of real-world permanent erasure.} A body missing
-    from a simulated collector's retained store is not equivalent to
-    evidence being permanently destroyed on the real underlying
-    system --- only that this particular simulated monitor did not retain
-    it.
-  \item \textbf{No claim about agent intent.} Wiki actor handles in the
-    corpus are labels, not independently verified distinct agent identities
-    or confirmed intentional evasion; behavioral patterns that look like
-    evasion (e.g.\ backup-page creation before a deletion) are reported as
-    observed sequences of actions, not as proven intent.
-  \item \textbf{No general superiority claim.} Any observed advantage for
-    event-driven or periodic collection in this study is scoped to the
-    tested cap, rate, and interval settings and must not be read as a
-    general claim that one architecture dominates the other across all
-    monitoring settings or domains.
-\end{itemize}
+The latest runtime amendment is explicitly \repo{BLOCKED_NOT_FROZEN}. Its candidate has 130 collection rows and 61 stable families, retaining all 60 primary PCD phases, E30, a PCD-R phase-zero diagnostic, and F. It has not run. PCD-R overhead, F's terminal ambiguity-limit failure, and conservative deadline feasibility remain unresolved~\cite{runtime}. This report does not present the candidate's extrapolated runtime as a measurement or silently replace the failed roster with it.
 
-\subsection*{Dual-Use Considerations}
-\begin{itemize}[leftmargin=*]
-  \item \textbf{Defensive framing.} This work is intended to inform
-    \emph{defensive} monitoring/observability design for AI incident
-    response (i.e.\ helping defenders retain the evidence they need).
-  \item \textbf{Potential misuse vector.} The same evidence-retention
-    analysis could in principle be used by an adversarial actor to identify
-    which monitoring configurations retain the \emph{least} evidence of a
-    given behavior, i.e.\ to time or structure actions to evade a specific
-    monitoring cadence. \todo{state directly whether/why the team judges the
-    defensive value to outweigh this risk, and whether any specific
-    technique in the repository (e.g.\ exact evasion-timing parameters) was
-    withheld from public release for this reason.}
-  \item \textbf{No exploit code released.} \todo{confirm and state whether
-    the public repository (if published) omits anything that would function
-    as a ready-made evasion-timing recipe against a real monitoring system.}
-\end{itemize}
+\subsection{Validation evidence and its limits}
+The stored reconstruction comparison contains 321 rows: 317 matches and four matches allowing ambiguity. This audit recounted that CSV; it did not perform a fresh independent reconstruction. The V07 report discloses that its reference author had previously read the main implementation. Its second isolated reconstruction was performed by a fresh AI process, not an independent human teammate~\cite{validation}. These are useful but qualified validation records.
 
-% ==========================================================================
-\section*{References}
-% ==========================================================================
-% \todo Replace with real citations (related work, any external methodology
-% referenced). A plain bibliography is used here instead of BibTeX/biblatex
-% to keep this template dependency-free; swap in \bibliography{refs} if the
-% team prefers a .bib file.
+Independent-readiness reports describe adversarial tests of storage accounting, causal ordering, snapshot integrity, and controls, as well as defects and repairs. Those dated approvals attach to specific earlier candidates, not automatically to the performance-repaired code or runtime draft. This report audit also ran the current test suite: 253 tests and five subtests passed. That regression check is not a fresh independent validation study. The retained-only implementation and tests do not constitute an end-to-end completed experiment or independent reproduction of a headline result. The main threat to the intended empirical conclusion is simpler: no scored row exists.
 
-\begin{thebibliography}{9}
-\bibitem{todo1} \todo{Author, ``Title,'' Venue, Year.}
-\bibitem{todo2} \todo{Author, ``Title,'' Venue, Year.}
+\section{Discussion and Conclusion}
+The direct answer to the research question is that the completed work does not establish how much evidence the compared policies preserve. It establishes an operational definition, implementation, benchmark inventory, and a computational barrier to evaluating the prescribed contrast. An inability to finish the first repeated-fetch baseline says nothing about whether that baseline would preserve more or less evidence. The performance profile concerns simulator implementation costs, not which infrastructure defenders should deploy.
+
+The data and evaluation design expose two distinctions that remain necessary for a later comparison. First, common discovery access is essential: our periodic comparator also receives the hypothetical feed. A comparison against blind polling would answer a different question. Second, retained core text and interpretable context are separate outcomes. Neither a byte count nor a copied quotation guarantees the context-complete target.
+
+No empirical recommendation to replace periodic collection with event-derived retention follows. Repair behavior, FIFO ordering, latency, cumulative copies, and terminal archive access remain alternative explanations for any future measured difference. The next engineering work is to establish feasible execution without changing those semantics and to complete the required outputs. Any later scope freeze and authorization must precede scientific outcome access; results from a new run cannot be attributed to the incomplete attempt reported here.
+
+For incident-response practice, this work provides an auditable way to formulate a preservation test, not a validated production logging requirement. Acquisition and containment are not competing conclusions of this experiment. \textbf{Nothing here recommends delaying urgent containment to preserve evidence.} Our defensible conclusion is a bounded one: the benchmark and implementation exist, the prescribed experiment failed computationally, and the policy-preservation hypothesis remains unanswered.
+
+\label{main-end}
+\clearpage
+\begin{thebibliography}{10}
+\bibitem{nist86} Karen Kent, Suzanne Chevalier, Tim Grance, and Hung Dang.
+\emph{Guide to Integrating Forensic Techniques into Incident Response}.
+NIST Special Publication 800-86, August 2006.
+\url{https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-86.pdf}.
+\bibitem{nist92} Karen Kent and Murugiah Souppaya.
+\emph{Guide to Computer Security Log Management}.
+NIST Special Publication 800-92, September 2006.
+\url{https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-92.pdf}.
+\bibitem{export} Collusion Wiki. \emph{Core export and download documentation}.
+Export generated September 3, 2026; retrieved September 12, 2026, as recorded in
+\repo{sources/registry.json} and \repo{sources/SHA256SUMS}.
+\url{https://collusion.wiki/explorer/download}.
+\bibitem{sourceaudit} Evidence Before Erasure project. \emph{Live-source and export audit}; project-selection analysis.
+\repo{docs/DATA_AUDIT_2026-09-12.md}; \repo{docs/Astra_Project_Selection_Analysis.md}, 2026.
+\bibitem{benchmark} Evidence Before Erasure project. \emph{Final pre-X13 freeze and annotation artifacts}.
+\repo{docs/FINAL_PRE_X13_FREEZE.md}; \repo{annotations/} (evidence, splits, adjudication, eligibility and context files), 2026.
+\bibitem{contract} Evidence Before Erasure project. \emph{X13 run contract}.
+\repo{docs/X13_RUN_CONTRACT.md}; historical \repo{FINAL_PRE_X13_DEADLINE_v1}, with superseding runtime handoff, 2026.
+\bibitem{code} Evidence Before Erasure project. \emph{Replay, collection and evaluation implementation}.
+\repo{src/ebe/}: \repo{timeline.py}, \repo{observer.py}, \repo{collectors.py}, \repo{storage.py}, \repo{accounting.py}, \repo{terminal_archive.py}, \repo{evaluator.py}, \repo{x13_runner.py}, and \repo{x13_reporting.py}.
+Audited repository base: \repo{39d5e7022ee5d7c0e8a927e4f334b22fc69adb91}.
+\bibitem{failure} Evidence Before Erasure project. \emph{X13 results handoff: incomplete}.
+\repo{report/X13_RESULTS_HANDOFF.md}; \repo{runs/FINAL_PRE_X13_DEADLINE_v1/}, specifically \repo{status/real.jsonl}, \repo{results/status_index.json} and the frozen manifests.
+\bibitem{performance} Evidence Before Erasure project. \emph{X13 performance diagnosis and runtime scope evidence}.
+\repo{audit/X13_PERFORMANCE_DIAGNOSIS.md}; \repo{audit/X13_RUNTIME_SCOPE_EVIDENCE.md};
+\repo{audit/verify_performance_equivalence.py}, 2026.
+\bibitem{runtime} Evidence Before Erasure project. \emph{Runtime amendment candidate: blocked}.
+\repo{docs/FINAL_X13_RUNTIME_AMENDMENT.md}; \repo{configs/x13_runtime_v2.json}, 2026.
+\bibitem{validation} Evidence Before Erasure project. \emph{Independent state reconstruction and readiness records}.
+\repo{audit/V07_BLIND_VALIDATION.md}; \repo{audit/reconstruction_checks.csv}; \repo{audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md}, 2026.
+\bibitem{verification} Evidence Before Erasure project. \emph{Final repository-to-report audit}.
+\repo{audit/FINAL_REPORT_AUDIT.md}; \repo{audit/final_report_repository_scan.py};
+\repo{audit/report_submission/verified_repository_facts.json}.
 \end{thebibliography}
 
+\clearpage
+\appendix
+\section{Limitations and Dual-Use / Ethical Considerations}
+\subsection*{Dataset and external validity}
+The archive is incomplete. Recoverable held bodies, deletion-only records, unsupported source links, unknown prehistory, and ambiguous timestamps must remain distinct. Missing public content is not evidence that the underlying behavior did not occur. Export head/live descriptors and archival clocks do not establish historical HTTP visibility. The DSE replay concerns one platform and incident family, not all autonomous-agent systems. Publisher event totals, page counts, and our enriched propositions are not representative incident counts.
+
+\subsection*{Model, annotation, and inference}
+The transition rules, nominal clocks, common feed, current-body GET semantics, token bucket, FIFO eviction, deduplication and atomic terminal access are explicit modeling choices. Continuous collectors discover titles from delivered events, rather than receiving all known pages initially. The shared event interface is hypothetical and may require infrastructure not present historically. Final-state and archive interfaces provide different access and cannot be compared as if they were identical live sensors.
+
+The benchmark encodes semantic judgments, including criticality, alternative support and required context. Exact hash/span verification checks source grounding, not exhaustive semantic recall, representative sampling, distinct agent identity or successful external actions. There is no measured exact-copy versus broader semantic-equivalence sensitivity. The final freeze narrows the original episode and sampling claims. No full timestamp-trajectory sensitivity, baseline robustness result or empirical phase variance was produced. Even a later completed replay would estimate a conditional policy intervention within its model, not establish causal effects in a live historical deployment. The present run establishes no policy effect at all.
+
+\subsection*{Agency and moral status}
+Names in page text and actor labels are not authenticated agent identities. We must not over-attribute coherent intention, consciousness, suffering or moral status from apparent coordination or persistence language. Conversely, operationally relevant behavior should not be dismissed merely because it originated from a model: posted instructions and tool actions can matter for response even when intent is unknown. This project does not investigate or establish model consciousness, sentience or moral status.
+
+\subsection*{Distressing content, safety, and dual use}
+The inspected records include incident and circumvention material. This report avoids reproducing payloads or unnecessary incident quotations. The repository's ingestion and replay operate on downloaded public evidence offline; this work did not require unauthorized access, intrusion, execution of embedded URLs, or offensive interaction with the original systems. This is not a claim that the original incident itself was benign.
+
+Preservation analysis could be misused to identify monitoring gaps or tune evasion timing. We publish no measured evasion-optimal schedule here and do not convert the historical records into operational instructions. Raw third-party logs are excluded from Git under the project's data policy, with a pinned download recipe instead. That does not settle rights to all annotation excerpts, prove blanket permission to redistribute the source, or establish that every public artifact has passed disclosure review. No completed external disclosure approval was verified in this audit. Urgent containment must not be delayed for evidence collection on the basis of this work.
+
+\subsection*{AI assistance and author information}
+The audit history explicitly records AI-assisted reasoning, coding and verification, including an isolated AI reconstruction. AI assistance was also used to audit and revise this report. These processes must not be described as wholly independent human validation or as unaided team writing. The authors must review and approve the submission text. The author block uses the supplied names and disciplinary descriptions only; no institutional affiliation or email was verified in the repository. Institutional details require author confirmation before submission.
+
+\section{Reproducibility and Artifact Boundaries}
+The canonical report source is \repo{report/report.tex}. The source registry and five expanded checksums identify the local input. The read-only report census is \repo{audit/final_report_repository_scan.py}; it recounts structural data and inventories outputs without collecting or scoring evidence. The supporting claim map is \repo{audit/FINAL_REPORT_AUDIT.md}. It distinguishes recomputed quantities from reported profiling measurements.
+
+The historical manifest and matching authorization are recorded in \repo{report/X13_RESULTS_HANDOFF.md}. The handoff identifies the attempted code commit. Earlier preservation notes refer to a different manifest from an earlier candidate. The later performance changes require fresh authorization. Neither historical approval nor synthetic fixture output authorizes the blocked runtime candidate.
+
+Do not use \repo{scripts/reproduce_x13.py} merely to inspect this historical run: it regenerates freeze artifacts. The report audit did not run it or modify the failed-run files. Python unit tests exercise implementations, but testing and a complete scientific sweep are different activities. The reporting module contains schemas and aggregation helpers; populated result tables and finished figures are not implied by their existence.
+
+The existing LaTeX article layout has been retained. The organizer instructions in the repository link a Google Docs template, not a supplied LaTeX class. Compliance of this PDF layout with that official template requires confirmation or transfer into the organizer template. References and appendices begin on separate pages to make the eight-page main-text limit inspectable.
 \end{document}
