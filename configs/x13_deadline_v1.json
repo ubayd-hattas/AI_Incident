@@ -1,0 +1,20 @@
+{
+  "amendment": "FINAL_PRE_X13_DEADLINE_v1",
+  "classification": "exploratory prespecified finite-benchmark simulation",
+  "horizon_start": "2026-05-24T00:00:00Z",
+  "checkpoint": "2026-07-15T00:00:00Z",
+  "capacity_bytes": 1048576,
+  "feed_poll_interval_us": 60000000,
+  "primary": {
+    "comparator": "PCD15",
+    "event_collector": "E30",
+    "held_out_critical_denominator": 23,
+    "threshold_percentage_points": 10
+  },
+  "authorization": {
+    "real_scoring": false,
+    "required_artifact": "gate2_authorization.json"
+  },
+  "expected_collection_rows": 791,
+  "expected_stable_rescore_families": 61
+}
