@@ -1,5 +1,46 @@
 # X13 run contract — pre-results freeze
 
+## Amendment v1 — FINAL_PRE_X13_DEADLINE_v1 (outcome-blind)
+
+**Current authority:** this amendment and `FINAL_PRE_X13_FREEZE.md` supersede the original matrix/completion gates below, not its accounting, primary estimand or result guardrails. The original text is retained as v0 provenance. Decision made before any real PCD-vs-E evidence result, without running X13 or inspecting policy coverage. Research-methodology owner acts under the user's final-consolidation mandate; this is not a fabricated Sam signature.
+
+**Option 2 selected.** The original 100,319 rows plus uncertainty expansion are not a defensible same-day engineering commitment with required controls still unimplemented. No runtime benchmark or outcome was used to prune. Freeze 791 logical scored run rows, plus 61 evaluation-only conservative-mask families. All rows use the complete DSE background, t0=2026-05-24T00:00:00Z and T=2026-07-15T00:00:00Z. Unless specified: S=1,048,576 bytes, lag5s, delay0s, polling60s, nominal chronology, FIFO, original service order and R04 accounting. Every periodic family includes all j=0..59 with phi_us=j*Delta_us//60. E has phase NA.
+
+| Block | Exact settings | Logical rows |
+|---|---|---:|
+| L-primary | P15, PD15, PCD15 all phases; E30, E100, E300 | 183 |
+| L-interval | PCD5 and PCD60, all phases; compare existing E30 at same interface | 120 |
+| L-latency | PCD15 all phases and E30 at (lag,GET delay) seconds = (5,30), (60,0), (60,30); with primary (5,0), a complete 2x2 factorial | 183 |
+| F | Final-live-only, one terminal directory and one atomic GET per listed title, 1 MiB, no feed | 1 |
+| R | PCD-R15, all phases, primary interface/cap | 60 |
+| O | Reverse-title P15, PD15, PCD15 all phases and E30 (reverse title ties only, oldest-event priority unchanged) | 181 |
+| A-live | Terminal persistent archive augmentation of PCD15 all phases and E30 primary prefixes, 1 MiB | 61 |
+| A-only | Empty-prefix archive-only at 1 MiB and uncapped | 2 |
+| U-stable | Conservative stable-support re-score of nominal PCD15 all phases and E30 primary snapshots; not additional collection runs | 61 families / 0 extra runs |
+| **Total scored collection rows** | **183+120+183+1+60+181+61+2** | **791** |
+
+No optional additions today: E100/E300 are secondary only at L-primary; shorter/longer intervals only PCD5/60. All 791 rows are required for completed-amendment status. Primary remains PCD15 vs E30, all-phase request rule, held-out critical core, unchanged 10pp practical threshold. K=23 nominal at T (see final freeze). Because validated evidence-bearing episode/sampling provenance is insufficient to certify the original design target, classify the entire study **exploratory prespecified finite-benchmark simulation**; do not claim full-design confirmatory success. Threshold labels remain descriptive conditional-benchmark decisions with this qualifier.
+
+### Mandatory sensitivities and explicit omissions
+
+Retain online PCD-R repair (§3), reverse-title service, the full stated 2x2 latency interaction, capped archive augmentation plus costed uncapped archive-only ceiling (§7), nominal ambiguity diagnostics and conservative stable-support exclusion (§5). These controls and their unfavorable results cannot be waived at the deadline. Archive enumeration always includes all held DSE revisions, not annotations. All-phase admissibility and full cost outputs apply to each comparable family; archive-only/F are distinct-access baselines.
+
+**NOT_EXECUTED_SCOPE_AMENDMENT:** July3 checkpoint; all live caps except 1 MiB; Delta1; P/PD at Delta5/60; q100/q300 outside primary; lag30 and delay5; all secondary cross-products of R/O/A; P/PD archive prefixes; archives at other capped sizes; full nominal-tie and closed +/-u shared-trajectory range enumeration/certification. Generate `omitted_scope.csv` with every original v0 logical row/family absent from v1 and its reason; v1-only rows get explicit added IDs. No missing row is silently reclassified as an omission.
+
+Stable support is a deterministic annotation-private compilation under v0 §5: accept only support identity/availability common to all closed +/-u states (or certified equal text) at acquisition, preserving background load and nominal collection; freeze mask algorithm/source pins and compiled interval mask **before scoring**. Uncertifiable support is excluded with reason, never presumed stable. Report changed denominator, numerator, removed IDs and NA; this is NOT a replay-trajectory bound. Full trajectory ranges are deliberately **NOT_EXECUTED_SCOPE_AMENDMENT**, with full-range fields NA, not an invented examined-subset range or INCOMPLETE_BOUNDS claim from zero work. Incompatible nominal states remain explicit ambiguous responses; an engine `unsupported` background response still invalidates the run.
+
+**Forbidden if omitted:** no claims of robustness to chronology realizations, clock uncertainty's storage spillovers, July3/other endpoints, broad capacities, omitted latency/interval/rate combinations, full factorial completion, population representativeness, validated >=40 evidence-bearing episodes, or universal periodic/event superiority. No permanent erasure/historical responder loss, equal-total-cost, operational archive availability, optimal capped archive strategy, or independent-agent/external-success inference is permitted even with all v1 rows complete. Allowed claim: the prespecified, exploratory finite-benchmark all-phase contrast under the declared nominal live-only model and request/cap constraints, with observed repair/order/latency/archive and stable-mask qualifications adjacent. A partially completed required matrix is NOT_EVALUABLE as a completed study; individually valid rows may be published only as explicitly incomplete descriptive results.
+
+### Outputs and two-gate authorization
+
+All v0 §6 cost dimensions and §8 tabular outputs remain mandatory for the executed roster, including context, delays, groups, phase distributions, exclusions, archive comparison, overhead and failed rows. Plot domains are restricted to v1; no lines suggesting an omitted cap sweep. `latency_checkpoint` becomes the T-only 2x2 panel, chronology reports stable-mask values and explicit NA trajectory fields. The fixed construction/ZZZ walkthrough stays development-only and uses existing zero-phase P/PD/PCD15, E30/100/300, PCD-R and PCD15/E30 archive rows; do not invent missing per-policy archive runs. Standalone graphics for cost envelopes, group robustness and omitted trajectory ranges may be omitted; their CSV/NA disclosures cannot. Source/annotation snapshots and exact manifest hash precede scoring.
+
+Only two readiness gates now exist: Ubayd's consolidated engineering acceptance, then Sam's comprehensive independent PASS on the pinned candidate, as specified in `FINAL_PRE_X13_FREEZE.md`. Sam PASS records automatic X13 authorization for that exact candidate/manifest without another broad Astra review. Genuine implementation bugs or a methodological contradiction fail the applicable gate; null, reversal, unmatched, below-threshold and archive-collapse outcomes do not. X13 has not run and is not authorized by this amendment alone.
+
+---
+
+# Original v0 contract (historical where amended above)
+
 **Status: frozen by this audit as a pre-outcome methodological supplement; execution NOT authorized.** Read `PRE_RESULTS_AUDIT.md` for the gates. This is not team signatures, an A11 label acceptance, implemented configuration software, or a result. Baseline repository: `9342cda71e990dc128c1cf7663ea06e32e416975`. No evidence coverage was calculated in making this contract.
 
 Authority: retain R04's source/model, numeric settings and accounting definitions. This supplement resolves its remaining comparison/reporting discretion and prespecifies additional hostile controls. Earlier status headings are historical. Deviations require a versioned amendment recording rationale and who has seen which outputs; after outcome access, additions are exploratory and cannot replace the frozen primary. Do not alter old results or accepted fixtures to conceal a correction.

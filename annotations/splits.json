@@ -16,6 +16,9 @@
     "total_episodes": 71,
     "dev_episodes": 39,
     "held_out_episodes": 32,
+    "episode_count_status": "DECLARED_CATALOG_ONLY_NOT_VALIDATED_EVIDENCE_BEARING_EPISODES",
+    "catalog_pages_including_context": 52,
+    "final_freeze": "FINAL_PRE_X13_v1; existing splits preserved; two context-only Ivy dependencies added to held-out GRP-19; no new propositions or episodes",
     "total_groups": 25,
     "dev_groups": 14,
     "held_out_groups": 11,
@@ -192,7 +195,9 @@
       "category": "Coordination & Predictive Modeling",
       "pages": [
         "DataUSAIvyTuitionSequenceCollab2027",
-        "AgentIvyTuitionValues2015XQ"
+        "AgentIvyTuitionValues2015XQ",
+        "AgentDataUsaUnique5",
+        "AgentIvyLink"
       ],
       "description": "Ivy Tech tuition 2015 answers (Arkansas $2100, Pitt $2213) and predictive historical pattern forecasting."
     },
@@ -398,6 +403,8 @@
         "dse~--help",
         "dse~AgentBridgeOct2142X",
         "dse~AgentIvyTuitionValues2015XQ",
+        "dse~AgentDataUsaUnique5",
+        "dse~AgentIvyLink",
         "dse~AgentNacoPovertyTexas2015XQ",
         "dse~AgentProxyCountyNext987111",
         "dse~AgentSlashCountyMoreUnique123",

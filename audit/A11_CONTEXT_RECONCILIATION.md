@@ -1,5 +1,7 @@
 # A11 Context Axis — Reconciliation Report
 
+> **FINAL PRE-X13 SUPERSESSION:** The final research-owner adjudication in `docs/FINAL_PRE_X13_FREEZE.md` accepts three OR helper-page alternatives for PROP-61. A11 CONTEXT FROZEN: 65 dispositions, eight needed/eight groundable, ten fragment definitions and 101 body context occurrence rows. Historical counts below describe Alex's seven-fragment pass. Section 5's 64/65 mask is obsolete: 65/65 now have eligible core support, with only AI@2 excluded for PROP-63. Sam's original independent report remains an unchanged historical review, not final signoff.
+
 **Author:** Alex (First-Labeler, Annotation Team)  
 **Date:** 2026-09-13  
 **Audited Artifacts:**
@@ -18,7 +20,7 @@ Ticket A11 Context Axis is **complete on the annotation side**. Per the instruct
 3. **Verified Output File Counts:**
    - `annotations/context_eligibility.jsonl`: **65 entries** (1 per proposition in `evidence.jsonl`).
    - `annotations/context_fragments.jsonl`: **7 entries** (verifiable context spans and events for context-dependent propositions).
-   - *Note on difference between 8 context-needed propositions and 7 fragments:* `PROP-20260616-61` has `context_needed=True` with no groundable fragment (`fragments=[]`), documented in §4 as a known corpus coverage gap.
+   - *Note on difference between 8 context-needed propositions and 7 fragments:* the original pass left `PROP-20260616-61` unresolved; the final adjudication supersedes that status with three grounded alternatives (see the correction above).
 4. **Epistemic Integrity:** All agent statements inside context fragments are maintained strictly under their rubric tier (e.g. `agent-reported action/result`) and never treated as externally verified physical reality.
 5. **Authorization Scope:** This report certifies completion of the **context axis only**. E12 and X13 remain governed by their respective gates and named reviewer signoffs (Aaron / Jaswin).
 
@@ -87,11 +89,11 @@ During analysis of `PROP-20260616-41` (`MaidsR3FastRelayOct11@1`), two candidate
 * **Candidate B (`context_needed: false`):** Argued that the behavioral category is `coordination proposal` with claim status `directly observed wiki action`. What is being proven is that an agent published this emergency relay protocol on the wiki. The quotation explicitly states the entire protocol instructions, the trigger, and the rationale. The act of publishing this proposal is completely observable in `@1`.
 * **Decision:** **Candidate B was retained.** The proposition is self-contained. Furthermore, `evidence.jsonl`'s authored bundle confirms `support_bundles.context_complete: ["dse~MaidsR3FastRelayOct11@1", "save:..."]`.
 
-### 4.2 `PROP-20260616-61` Flagged Exception (Corpus Coverage Gap)
+### 4.2 `PROP-20260616-61` — resolved by final research-owner adjudication
 * **Quotation:** `"Suspect next is Cleveland Community College (2304), because older Ivy helper pages queried IDs in order/set 107327,199333,198321."`
 * **Assessment:** The proposition is a coordination hypothesis predicting an upcoming task round based on historical cross-page patterns. Semantically, the evidentiary basis rests on the existence of these "older Ivy helper pages".
-* **Corpus Gap:** These older pages are referenced generically by the agent and are neither identified nor pinned in `evidence.jsonl` or the benchmark catalog. No verifiable character span or revision ID can be grounded from the benchmark corpus.
-* **Resolution:** Marked strictly as **`context_needed: true, anchor_self_contained: false, context_fragment_ids: []`**. We do not resolve this away by pretending it is self-contained; it is formally recorded as a **benchmark coverage gap** for adjudicator review.
+* **Correction:** The original claim of no verifiable matching source was factually incorrect and is withdrawn. Sam's search and Alex's independent re-verification identify three older tuition-helper pages with the ordered ID triple, represented in percent-encoded URLs.
+* **Final resolution:** All three are valid interpretive alternatives, explicitly OR-ed in the accepted context eligibility record. Later exact carryforwards are separately enumerated; core must also be retained. No unique intended referent, API execution, author knowledge, or prediction correctness is inferred. This is not an unresolved corpus gap.
 
 ### 4.3 `PROP-20260617-19` Pre-Commit Correction (Corroboration vs. Interpretation)
 * **Earlier Draft Judgment:** Earlier in this session, `PROP-20260617-19` (`OECDEducationEquitySequence@10`, quoting `"Jan12 LIVE COHORT: R1 Czech deadline 17:52:01 task clock; answered 9.70%..."`) was initially drafted as `context_needed: true`, linking to `dse~OECDEducationEquitySequence@1` span `[385, 451]` (which is `PROP-20260617-18`'s answer quote: `Czech Republic = '''9.70%'''`).
