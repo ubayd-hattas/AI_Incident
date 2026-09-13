@@ -231,14 +231,14 @@ check("Case J: delay uses the earliest completed alternative (120.0s), not the l
       res_j.delay_seconds == expected_delay_seconds, f"got {res_j.delay_seconds} expected {expected_delay_seconds}")
 check("Case J: status is 'retained'", res_j.status == "retained", res_j.status)
 
-# --- Case K: context not frozen. Expected: explicit NOT_FROZEN status, NOT a fabricated 0%. ---
+# --- Case K: final self-contained context equals core. ---
 _body_k = b"core content"
 snap_k = RetainedSnapshot(M(10), (RetainedBodyRecord("dse~K", M(1), _body_k, _h(_body_k)),), ())
 frag_k = {"f1": Fragment("f1", "dse~K", "body_span", required_substring=b"core content")}
-prop_k = Proposition("CASE-K", True, (("f1",),), context_alternatives=())  # no context modeled
+prop_k = Proposition("CASE-K", True, (("f1",),), context_alternatives=(("f1",),))
 res_k = compute_context_coverage([prop_k], frag_k, snap_k, critical_only=False)
-check("Case K: context status is NOT_FROZEN (not a fabricated percentage)", res_k.status == "NOT_FROZEN", res_k.status)
-check("Case K: context percentage is None, never 0.0", res_k.percentage is None, str(res_k.percentage))
+check("Case K: final self-contained context is scored", res_k.status == "OK", res_k.status)
+check("Case K: self-contained context exactly follows core", res_k.percentage == 100.0, str(res_k.percentage))
 
 print("\n" + "=" * 60)
 print(f"HAND-SCORED CASES A-K FAILURES: {len(FAILURES)}")
