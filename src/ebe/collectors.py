@@ -371,7 +371,8 @@ class PeriodicCollector:
     def _run_repair(self) -> CollectorResult:
         """Frozen online PCD-R control, including synthetic delayed completions."""
         config = self.config
-        store = CaptureStore(config.capacity_bytes, deduplicate=True, start_time=HORIZON_START)
+        store = CaptureStore(config.capacity_bytes, deduplicate=True, start_time=HORIZON_START,
+                             retain_history=not self.compact)
         beliefs: dict[str, _Belief] = {}; dirty: set[str] = set()
         # Content-free repair metadata: last completed known hash and byte length.
         last_known: dict[str, tuple[str, int]] = {}
@@ -380,13 +381,39 @@ class PeriodicCollector:
         result_indexes: dict[int, int] = {}
         polls=[]; sweeps=[]; results=[]; attempts=[]
         peak_discovered=peak_dirty=metadata_peak=0
+        # dispatch_count always equals what len(results) would be, in both
+        # modes; kept explicit so compact mode need not grow that list just
+        # to compute the prospective request_seq used for the cap pre-check.
+        dispatch_count=0
+        capture_attempt_count=0
+        capture_admitted_count=0
+        # Incremental mirror of "is (page_key, body_sha256) currently one of
+        # store.retained_captures", kept exactly in step with every admission
+        # and eviction below. Replaces an O(known pages x retained packets)
+        # linear rescan of store.retained_captures on every sweep, which is
+        # what actually made PCD-R infeasible (not per-request diagnostic
+        # history, which the compact path above already addresses).
+        retained_hash_count: dict[tuple[str, str], int] = {}
+        retained_page_hash_by_seq: dict[int, tuple[str, str]] = {}
+
+        def _note_evictions(evicted_request_seqs: tuple[int, ...]) -> None:
+            for seq in evicted_request_seqs:
+                key = retained_page_hash_by_seq.pop(seq, None)
+                if key is None:
+                    continue
+                remaining = retained_hash_count[key] - 1
+                if remaining:
+                    retained_hash_count[key] = remaining
+                else:
+                    del retained_hash_count[key]
+
         sweep_iter=iter(periodic_sweep_times(config.interval_us, config.phase_us,
                                              checkpoint=config.checkpoint))
         next_sweep=next(sweep_iter,None); next_poll=HORIZON_START
         poll_step=timedelta(microseconds=self.observer.config.feed_poll_interval_us)
 
         def apply_completion(response: BodyResponse) -> None:
-            nonlocal metadata_peak
+            nonlocal metadata_peak, capture_attempt_count, capture_admitted_count
             pending = pending_by_seq.pop(response.request_seq, None)
             if pending is not None:
                 remaining = pending_by_title[pending.page_key] - 1
@@ -394,12 +421,23 @@ class PeriodicCollector:
                     pending_by_title[pending.page_key] = remaining
                 else:
                     del pending_by_title[pending.page_key]
-                results[result_indexes[response.request_seq]] = response
+                if not self.compact:
+                    results[result_indexes[response.request_seq]] = response
             if response.outcome is BodyOutcome.BODY:
                 assert response.body is not None
                 capture=Capture(response.page_key,response.response_time,
                                 response.request_seq,response.body)
-                attempts.append(CaptureAttempt(capture,store.admit(capture)))
+                admission=store.admit(capture)
+                _note_evictions(admission.evicted_request_seqs)
+                if admission.disposition == "admitted":
+                    key = (capture.page_key, capture.body_sha256)
+                    retained_hash_count[key] = retained_hash_count.get(key, 0) + 1
+                    retained_page_hash_by_seq[capture.request_seq] = key
+                if self.compact:
+                    capture_attempt_count += 1
+                    capture_admitted_count += admission.disposition == "admitted"
+                else:
+                    attempts.append(CaptureAttempt(capture,admission))
                 last_known[response.page_key]=(capture.body_sha256,len(capture.body))
             else:
                 # Every unavailable completed outcome disables repair until a
@@ -423,7 +461,9 @@ class PeriodicCollector:
             # At a common instant the frozen order is feed update, due
             # completion, then the new periodic reads.
             if next_poll<=config.checkpoint and next_poll==now:
-                poll=self.observer.poll_feed(next_poll); polls.append(poll)
+                poll=self.observer.poll_feed(next_poll)
+                if not self.compact or poll.records:
+                    polls.append(poll)
                 self._apply_feed_batch(poll,beliefs,dirty)
                 peak_discovered=max(peak_discovered,len(beliefs)); peak_dirty=max(peak_dirty,len(dirty))
                 next_poll+=poll_step
@@ -433,16 +473,16 @@ class PeriodicCollector:
             if next_sweep!=now:
                 continue
 
-            assert next_sweep is not None; sweeps.append(next_sweep)
+            assert next_sweep is not None
+            if not self.compact:
+                sweeps.append(next_sweep)
             ordinary={p for p in dirty if beliefs[p] in {_Belief.LIVE,_Belief.MIXED}}
             repairs=set()
-            prospective=len(results)+1
+            prospective=dispatch_count+1
             for page_key,(body_hash,body_len) in last_known.items():
                 if beliefs.get(page_key) not in {_Belief.LIVE,_Belief.MIXED}: continue
                 if pending_by_title.get(page_key,0): continue
-                retained=any(p.page_key==page_key and p.body_sha256==body_hash
-                             for p in store.retained_captures)
-                if retained: continue
+                if retained_hash_count.get((page_key, body_hash), 0) > 0: continue
                 dummy=Capture(page_key,next_sweep,prospective,b"x"*body_len)
                 if config.capacity_bytes is None or len(dummy.packet_bytes)+body_len<=config.capacity_bytes:
                     repairs.add(page_key)
@@ -451,11 +491,14 @@ class PeriodicCollector:
                 is_ordinary=page_key in ordinary
                 if not is_ordinary:
                     body_len=last_known[page_key][1]
-                    dummy=Capture(page_key,next_sweep,len(results)+1,b"x"*body_len)
+                    dummy=Capture(page_key,next_sweep,dispatch_count+1,b"x"*body_len)
                     if config.capacity_bytes is not None and len(dummy.packet_bytes)+body_len>config.capacity_bytes:
                         continue
-                response=self.observer.get_body(page_key,next_sweep); results.append(response)
-                result_indexes[response.request_seq]=len(results)-1
+                response=self.observer.get_body(page_key,next_sweep)
+                dispatch_count+=1
+                if not self.compact:
+                    results.append(response)
+                    result_indexes[response.request_seq]=len(results)-1
                 if isinstance(response,PendingBodyRequest):
                     pending_by_seq[response.request_seq]=response
                     pending_by_title[page_key]=pending_by_title.get(page_key,0)+1
@@ -465,6 +508,9 @@ class PeriodicCollector:
             metadata_peak=max(metadata_peak,len(canonical_jsonl({
                 page:[digest,length] for page,(digest,length) in sorted(last_known.items())})))
             next_sweep=next(sweep_iter,None)
+        if not self.compact:
+            capture_attempt_count=len(attempts)
+            capture_admitted_count=sum(item.admission.disposition == "admitted" for item in attempts)
         snapshot=store.snapshot(config.checkpoint)
         retained_evidence=tuple(RetainedEvidenceUnit(
             rc.page_key,rc.capture_time,rc.request_seq,rc.body_sha256,
@@ -474,7 +520,10 @@ class PeriodicCollector:
             self.observer.discovered_titles,peak_discovered,peak_dirty,
             retained_evidence=retained_evidence,
             retained_export=store.export_retained(config.checkpoint),
-            repair_metadata_peak_bytes=metadata_peak)
+            repair_metadata_peak_bytes=metadata_peak,
+            body_request_count=self.observer.costs(config.checkpoint).body_requests,
+            capture_attempt_count=capture_attempt_count,
+            capture_admitted_count=capture_admitted_count)
 
     @staticmethod
     def _apply_feed_batch(

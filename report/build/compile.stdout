@@ -1,0 +1,20 @@
+note: Running TeX ...
+warning: report.tex:184: Underfull \hbox (badness 1062) in paragraph at lines 180--184
+warning: report.tex:184: Underfull \hbox (badness 10000) in paragraph at lines 180--184
+warning: report.tex:203: Underfull \hbox (badness 1721) in paragraph at lines 201--203
+warning: report.tex:203: Underfull \hbox (badness 10000) in paragraph at lines 201--203
+warning: report.tex:206: Underfull \hbox (badness 7168) in paragraph at lines 203--206
+warning: report.tex:210: Underfull \hbox (badness 2529) in paragraph at lines 208--210
+note: Rerunning TeX because "report.out" changed ...
+warning: report.tex:184: Underfull \hbox (badness 1062) in paragraph at lines 180--184
+warning: report.tex:184: Underfull \hbox (badness 10000) in paragraph at lines 180--184
+warning: report.tex:203: Underfull \hbox (badness 1721) in paragraph at lines 201--203
+warning: report.tex:203: Underfull \hbox (badness 10000) in paragraph at lines 201--203
+warning: report.tex:206: Underfull \hbox (badness 7168) in paragraph at lines 203--206
+warning: report.tex:210: Underfull \hbox (badness 2529) in paragraph at lines 208--210
+warning: warnings were issued by the TeX engine; use --print and/or --keep-logs for details.
+note: Running xdvipdfmx ...
+note: Writing `report/build\report.log` (14.9560546875 KiB)
+note: Writing `report/build\report.out` (2.96484375 KiB)
+note: Writing `report/build\report.aux` (5.3203125 KiB)
+note: Writing `report/build\report.pdf` (67.212890625 KiB)
