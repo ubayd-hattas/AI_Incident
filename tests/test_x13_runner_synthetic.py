@@ -1,7 +1,12 @@
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
 import json
-from ebe.x13_runner import (LOGICAL_RESULT_FIELDS, _serialize_with_artifact_size,
+from ebe.accounting import synchronized_accounting
+from ebe.x13_runner import (LOGICAL_RESULT_FIELDS, _collector_aux_bytes,
+                            _combined_points, _serialize_with_artifact_size,
                             synthetic_executor, AuthorizationError, run)
 from ebe.x13_manifest import configuration_rows
 ROOT=Path(__file__).resolve().parents[1]
@@ -23,5 +28,19 @@ def test_artifact_disk_bytes_matches_materialized_json_size():
     encoded=_serialize_with_artifact_size(result)
     decoded=json.loads(encoded)
     assert decoded["result"]["artifact_disk_bytes"] == len(encoded)
+def test_runner_merges_real_ledgers_through_verified_synchronized_accounting():
+    start=datetime(2026,5,24,tzinfo=timezone.utc)
+    points=_combined_points(
+        [(start,0),(start+timedelta(seconds=1),100),(start+timedelta(seconds=3),20)],
+        [(start,0),(start+timedelta(seconds=2),50)],
+    )
+    combined=synchronized_accounting(points,start+timedelta(seconds=4))
+    assert combined.synchronized_peak_s_plus_m == 150
+    assert combined.s_byte_microseconds == 220_000_000
+    assert combined.m_byte_microseconds == 100_000_000
+    assert combined.combined_byte_microseconds == 320_000_000
+def test_measured_pcdr_repair_metadata_populates_collector_aux_memory():
+    assert _collector_aux_bytes(SimpleNamespace(repair_metadata_peak_bytes=123)) == 123
+    assert isinstance(_collector_aux_bytes(SimpleNamespace(repair_metadata_peak_bytes=None)),str)
 def test_real_mode_requires_authorization():
     with pytest.raises(AuthorizationError): run(ROOT,mode="real",max_rows=0)

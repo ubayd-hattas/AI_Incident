@@ -88,6 +88,12 @@ def _combined_points(s_points, m_points):
     return points
 
 
+def _collector_aux_bytes(result: Any) -> int | str:
+    """Return measured logical collector memory where the policy exposes it."""
+    measured = None if result is None else getattr(result, "repair_metadata_peak_bytes", None)
+    return measured if measured is not None else NA_NOT_SEPARATELY_MEASURABLE
+
+
 @dataclass(frozen=True, slots=True)
 class RunOutcome:
     status: RunStatus
@@ -306,7 +312,7 @@ def _make_real_executor(repo: Path) -> Callable[[dict[str, Any]], RunOutcome]:
             "starvation_events": event_stats.token_starved_dispatch_opportunities if event_stats is not None else na_event,
             "dropped_work": 0 if event_stats is not None else na_event,
             "reused_from": NA_NOT_REUSED,
-            "aux_collector_bytes": NA_NOT_SEPARATELY_MEASURABLE,
+            "aux_collector_bytes": _collector_aux_bytes(result),
             "aux_store_bytes": NA_NOT_SEPARATELY_MEASURABLE,
             "aux_evaluator_bytes": NA_NOT_SEPARATELY_MEASURABLE,
             "artifact_disk_bytes": NA_PENDING_ARTIFACT,

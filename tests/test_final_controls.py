@@ -53,28 +53,44 @@ def test_pcdr_repairs_evicted_title_without_shared_provenance():
 def test_pcdr_pending_request_suppresses_duplicate_repair_until_completion():
     PeriodicCollectorTests.setUpClass()
     helper=PeriodicCollectorTests()
-    a=helper.revision("A", "1", dt("2026-05-24T00:00:10Z"), b"aaaa")
+    a1=helper.revision("A", "1", dt("2026-05-24T00:00:10Z"), b"aaaa")
     b=helper.revision("B", "1", dt("2026-05-24T00:01:10Z"), b"bbbb")
-    result=helper.collect(PeriodicPolicy.PCD_R,[helper.save(a),helper.save(b)],[a,b],
-        interval_minutes=1,capacity=170,delay_us=30_000_000,
-        checkpoint="2026-05-24T00:05:00Z")
-    a_requests=[x for x in result.body_results if x.page_key=="dse~A"]
-    assert [x.request_time for x in a_requests] == [
-        dt("2026-05-24T00:01:00Z"), dt("2026-05-24T00:03:00Z")]
-    assert all(x.response_time == x.request_time + timedelta(seconds=30) for x in a_requests)
+    a2=helper.revision("A", "2", dt("2026-05-24T00:02:40Z"), b"cccc")
+    result=helper.collect(PeriodicPolicy.PCD_R,
+        [helper.save(a1),helper.save(b),helper.save(a2)],[a1,b,a2],
+        interval_minutes=1,capacity=170,delay_us=90_000_000,
+        checkpoint="2026-05-24T00:09:00Z")
+    assert [(x.page_key,x.request_time) for x in result.body_results] == [
+        ("dse~A",dt("2026-05-24T00:01:00Z")),
+        ("dse~B",dt("2026-05-24T00:02:00Z")),
+        ("dse~A",dt("2026-05-24T00:03:00Z")),
+        ("dse~B",dt("2026-05-24T00:05:00Z")),
+        ("dse~A",dt("2026-05-24T00:07:00Z")),
+    ]
+    assert all(x.response_time == x.request_time + timedelta(seconds=90)
+               for x in result.body_results)
+    # A's old object is evicted at 03:30, but its update request remains
+    # pending through the 04:00 sweep. Completion at 04:30 clears the pending
+    # index and updates repair provenance to the new body, later repaired at 07:00.
+    assert [x.body for x in result.body_results if x.page_key=="dse~A"] == [
+        b"aaaa",b"cccc",b"cccc"]
 
 
 def test_pcdr_unavailable_completion_disables_repair_until_new_known_completion():
     PeriodicCollectorTests.setUpClass()
     helper=PeriodicCollectorTests()
     known=helper.revision("A", "1", dt("2026-05-24T00:00:10Z"), b"known")
-    unknown=helper.body_unknown("A", dt("2026-05-24T00:01:10Z"))
-    result=helper.collect(PeriodicPolicy.PCD_R,[helper.save(known),unknown],[known],
-        interval_minutes=1,capacity=1,delay_us=30_000_000,
-        checkpoint="2026-05-24T00:05:00Z")
+    other=helper.revision("B", "1", dt("2026-05-24T00:01:10Z"), b"other")
+    unknown=helper.body_unknown("A", dt("2026-05-24T00:02:10Z"))
+    result=helper.collect(PeriodicPolicy.PCD_R,
+        [helper.save(known),helper.save(other),unknown],[known,other],
+        interval_minutes=1,capacity=170,delay_us=30_000_000,
+        checkpoint="2026-05-24T00:07:00Z")
     requests=[x for x in result.body_results if x.page_key=="dse~A"]
-    assert len(requests) == 2
-    assert requests[-1].outcome.value == "body_unknown"
+    assert [(x.request_time,x.outcome.value) for x in requests] == [
+        (dt("2026-05-24T00:01:00Z"),"body"),
+        (dt("2026-05-24T00:03:00Z"),"body_unknown"),
+    ]
 
 
 def test_pcdr_primary_zero_delay_behavior_is_unchanged():

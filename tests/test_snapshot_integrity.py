@@ -73,6 +73,13 @@ def test_missing_or_wrong_object_id_is_typed_and_invalidates_all_packets():
         _snapshot(replace(export, packets=(export.packets[0], bad)))
 
 
+def test_duplicate_request_sequence_is_typed_and_invalidates_snapshot():
+    export = _export(shared=True)
+    duplicate = replace(export.packets[1], request_seq=export.packets[0].request_seq)
+    with pytest.raises(SnapshotIntegrityError, match="duplicate request sequence"):
+        _snapshot(replace(export, packets=(export.packets[0], duplicate)))
+
+
 def test_exact_cap_passes_and_cap_plus_one_fails_without_declared_total():
     snap = _snapshot(_export(shared=True))
     actual = snap.retained_packet_bytes + snap.retained_body_bytes
