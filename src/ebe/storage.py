@@ -30,6 +30,7 @@ class Capture:
     capture_time: datetime
     request_seq: int
     body: bytes
+    archive_key: str | None = None
 
     def __post_init__(self) -> None:
         require_utc(self.capture_time, "capture_time")
@@ -50,12 +51,15 @@ class Capture:
 
     @property
     def packet(self) -> dict[str, object]:
-        return {
+        value = {
             "body_sha256": self.body_sha256,
             "capture_time": format_timestamp(self.capture_time),
             "page_key": self.page_key,
             "request_seq": self.request_seq,
         }
+        if self.archive_key is not None:
+            value["archive_key"] = self.archive_key
+        return value
 
     @property
     def packet_bytes(self) -> bytes:
@@ -70,6 +74,28 @@ class RetainedCapture:
     body_sha256: str
     packet_bytes: bytes
     object_id: str
+    archive_key: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RetainedBodyObject:
+    object_id: str
+    body: bytes
+    body_sha256: str
+    refcount: int
+
+
+@dataclass(frozen=True, slots=True)
+class RetainedStoreExport:
+    checkpoint: datetime
+    capacity_bytes: int | None
+    packets: tuple[RetainedCapture, ...]
+    body_objects: tuple[RetainedBodyObject, ...]
+    retained_packet_bytes: int
+    retained_body_bytes: int
+    total_bytes: int
+    peak_bytes: int
+    accounting: StorageSnapshot
 
 
 @dataclass(slots=True)
@@ -156,6 +182,42 @@ class CaptureStore:
         self._oversize = 0
         self._audit: list[StorageAuditRecord] = []
         self._size_history: list[int] = [0]
+
+    @classmethod
+    def from_retained_export(cls, export: RetainedStoreExport) -> "CaptureStore":
+        """Restore exactly the terminal FIFO/object state for atomic augmentation."""
+        store = cls(export.capacity_bytes, deduplicate=True, start_time=export.checkpoint)
+        objects = {item.object_id: item for item in export.body_objects}
+        referenced: dict[str, int] = {}
+        for packet in export.packets:
+            item = objects.get(packet.object_id)
+            if item is None or sha256(item.body).hexdigest() != packet.body_sha256:
+                raise StorageError("invalid retained export body reference/hash")
+            referenced[packet.object_id] = referenced.get(packet.object_id, 0) + 1
+            store._packets.append(packet)
+            store._packet_bytes += len(packet.packet_bytes)
+            store._seen_request_seqs.add(packet.request_seq)
+        if set(referenced) != set(objects):
+            raise StorageError("retained export contains hidden/unreferenced objects")
+        for object_id, item in objects.items():
+            if referenced[object_id] != item.refcount:
+                raise StorageError("retained export refcount mismatch")
+            store._objects[object_id] = _BodyObject(item.body, item.refcount)
+            store._body_bytes += len(item.body)
+        if store.current_bytes != export.total_bytes:
+            raise StorageError("retained export declared totals mismatch")
+        store._peak_bytes = export.accounting.peak_store_bytes
+        store._byte_microseconds = export.accounting.store_byte_microseconds
+        store._evicted_packet_bytes = export.accounting.evicted_packet_bytes
+        store._evicted_body_bytes = export.accounting.evicted_body_bytes
+        store._admitted = export.accounting.admitted_packets
+        store._oversize = export.accounting.rejected_oversize_packets
+        if export.packets:
+            p = export.packets[-1]
+            store._last_order = (p.capture_time, p.request_seq, p.page_key)
+        store._last_time = export.checkpoint
+        store._size_history = [store.current_bytes]
+        return store
 
     @property
     def current_bytes(self) -> int:
@@ -253,7 +315,7 @@ class CaptureStore:
         obj.refcount += 1
         retained = RetainedCapture(
             capture.page_key, capture.capture_time, capture.request_seq,
-            capture.body_sha256, packet, object_id,
+            capture.body_sha256, packet, object_id, capture.archive_key,
         )
         self._packets.append(retained)
         self._packet_bytes += p
@@ -305,9 +367,35 @@ class CaptureStore:
             accrued,
         )
 
+    def export_retained(self, checkpoint: datetime) -> RetainedStoreExport:
+        """Immutable, self-contained retained-at-C export for E12 validation."""
+        snap = self.snapshot(checkpoint)
+        objects = tuple(sorted((
+            RetainedBodyObject(object_id, obj.body, sha256(obj.body).hexdigest(), obj.refcount)
+            for object_id, obj in self._objects.items()
+        ), key=lambda item: item.object_id))
+        # Recompute every declared quantity so corruption cannot be hidden by
+        # merely copying mutable counters into the export.
+        packet_bytes = sum(len(packet.packet_bytes) for packet in self._packets)
+        body_bytes = sum(len(obj.body) for obj in objects)
+        if packet_bytes != snap.retained_packet_bytes or body_bytes != snap.retained_body_bytes:
+            raise StorageError("retained export/accounting totals are not synchronized")
+        refs = {obj.object_id: 0 for obj in objects}
+        for packet in self._packets:
+            if packet.object_id not in refs:
+                raise StorageError("broken retained body object reference")
+            refs[packet.object_id] += 1
+        if any(refs[obj.object_id] != obj.refcount for obj in objects):
+            raise StorageError("retained body object refcount mismatch")
+        return RetainedStoreExport(
+            require_utc(checkpoint, "checkpoint"), self.capacity_bytes,
+            tuple(self._packets), objects, packet_bytes, body_bytes,
+            packet_bytes + body_bytes, snap.peak_store_bytes, snap,
+        )
+
 
 __all__ = [
     "AdmissionOrderError", "AdmissionResult", "Capture", "CaptureStore",
-    "HashCollisionError", "RetainedCapture", "StorageAuditRecord", "StorageError",
-    "StorageSnapshot",
+    "HashCollisionError", "RetainedBodyObject", "RetainedCapture", "RetainedStoreExport",
+    "StorageAuditRecord", "StorageError", "StorageSnapshot",
 ]

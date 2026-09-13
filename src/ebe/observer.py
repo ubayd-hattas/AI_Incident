@@ -127,6 +127,11 @@ class PendingBodyRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class _PendingState:
+    handle: PendingBodyRequest
+
+
+@dataclass(frozen=True, slots=True)
 class DirectoryResponse:
     request_time: datetime
     page_keys: tuple[str, ...]
@@ -219,6 +224,8 @@ class Observer:
         self._feed_cursor = 0
         self._last_poll: datetime | None = None
         self._last_dispatch: datetime | None = None
+        self._operation_clock = HORIZON_START
+        self._terminal_mode = False
         self._discovered: set[str] = set()
         self._request_seq = 0
         self._feed_requests = 0
@@ -235,6 +242,10 @@ class Observer:
         self._metadata_byte_microseconds = 0
         self._metadata_time = HORIZON_START
         self._audit: list[ObserverAuditRecord] = []
+        self._feed_audit: list[tuple[datetime, int, int]] = []
+        self._directory_audit: list[tuple[datetime, int]] = []
+        self._metadata_additions: list[tuple[datetime, int]] = []
+        self._pending_states: dict[int, _PendingState] = {}
 
     @property
     def discovered_titles(self) -> tuple[str, ...]:
@@ -269,8 +280,11 @@ class Observer:
             raise PollScheduleError("poll_time is not on the frozen epoch-aligned schedule")
         if self._last_poll is not None and poll_time <= self._last_poll:
             raise PollScheduleError("feed polls must be strictly increasing and deliver once")
-        if self._directory_requests:
+        if self._terminal_mode:
             raise ObserverError("terminal-directory and continuous-feed access cannot be mixed")
+        if poll_time < self._operation_clock:
+            raise ObserverTimeError("feed poll cannot move the operation clock backward")
+        self._operation_clock = poll_time
         self._advance_metadata(poll_time)
         self._last_poll = poll_time
         self._feed_requests += 1
@@ -289,6 +303,10 @@ class Observer:
         for record in visible:
             self._discovered.add(record.page_key)
             self._shared_metadata += len(record.canonical_bytes)
+        retained_addition = sum(len(record.canonical_bytes) for record in visible)
+        self._feed_audit.append((poll_time, len(response), retained_addition))
+        if retained_addition:
+            self._metadata_additions.append((poll_time, retained_addition))
         self._peak_shared_metadata = max(self._peak_shared_metadata, self._shared_metadata)
         return FeedPollResult(poll_time, tuple(visible), response)
 
@@ -330,6 +348,9 @@ class Observer:
         if not isinstance(page_key, str):
             raise TypeError("page_key must be an opaque string")
         request_time = self._horizon_time(request_time, "request_time")
+        if request_time < self._operation_clock:
+            raise ObserverTimeError("GET cannot move the operation clock backward")
+        self._operation_clock = request_time
         if self._last_dispatch is not None and request_time < self._last_dispatch:
             raise ObserverTimeError("body requests must be dispatched in nondecreasing time order")
         if self._last_poll is not None and request_time < self._last_poll:
@@ -342,12 +363,14 @@ class Observer:
         self._body_requests += 1
         request_seq = self._request_seq
         response_time = request_time + timedelta(microseconds=self.config.get_response_delay_us)
-        if response_time > HORIZON_END:
+        if response_time > HORIZON_END or self.config.get_response_delay_us:
             self._pending += 1
             self._audit.append(ObserverAuditRecord(
                 request_seq, page_key, request_time, None, None, 0, None, "pending"
             ))
-            return PendingBodyRequest(page_key, request_seq, request_time, response_time)
+            handle = PendingBodyRequest(page_key, request_seq, request_time, response_time)
+            self._pending_states[request_seq] = _PendingState(handle)
+            return handle
 
         if page_key not in self._discovered:
             outcome, body = BodyOutcome.UNKNOWN, None
@@ -374,12 +397,56 @@ class Observer:
         ))
         return BodyResponse(page_key, request_seq, request_time, response_time, outcome, header, body)
 
+    def complete_due(self, through_time: datetime) -> tuple[BodyResponse, ...]:
+        """Reveal delayed outcomes only once their response time is available."""
+        through_time = self._horizon_time(through_time, "through_time")
+        if through_time < self._operation_clock:
+            raise ObserverTimeError("completion cannot move the operation clock backward")
+        self._operation_clock = through_time
+        completed: list[BodyResponse] = []
+        due = sorted((state.handle for state in self._pending_states.values()
+                      if state.handle.response_time <= through_time),
+                     key=lambda x: (x.response_time, x.request_seq, x.page_key))
+        for handle in due:
+            if handle.page_key not in self._discovered:
+                outcome, body = BodyOutcome.UNKNOWN, None
+            else:
+                outcome, body = self._observe_state(handle.page_key, handle.response_time)
+            header = canonical_jsonl({"outcome": outcome.value})
+            self._outcomes[outcome] += 1
+            self._downloaded_metadata += len(header)
+            disposition: Literal["no_body", "available", "pending", "review_required"]
+            if outcome is BodyOutcome.BODY:
+                assert body is not None
+                self._downloaded_body += len(body); body_length = len(body); disposition = "available"
+            elif outcome is BodyOutcome.MISSING:
+                body_length = 0; disposition = "no_body"
+            else:
+                body_length = None
+                self._unknown_body_attempts += 1
+                disposition = "review_required" if outcome in {BodyOutcome.AMBIGUOUS, BodyOutcome.UNSUPPORTED} else "no_body"
+            index = next(i for i, record in enumerate(self._audit) if record.request_seq == handle.request_seq)
+            self._audit[index] = ObserverAuditRecord(handle.request_seq, handle.page_key,
+                handle.request_time, handle.response_time, outcome.value, len(header),
+                body_length, disposition)
+            self._pending -= 1
+            del self._pending_states[handle.request_seq]
+            completed.append(BodyResponse(handle.page_key, handle.request_seq,
+                handle.request_time, handle.response_time, outcome, header, body))
+        return tuple(completed)
+
     def terminal_directory(self, request_time: datetime = HORIZON_END) -> DirectoryResponse:
         request_time = self._horizon_time(request_time, "request_time")
         if request_time != HORIZON_END:
             raise ObserverTimeError("the frozen directory exists only at terminal checkpoint T")
+        if self._terminal_mode or self._directory_requests:
+            raise ObserverError("terminal directory is one-shot")
         if self._feed_requests:
             raise ObserverError("terminal-directory and continuous-feed access cannot be mixed")
+        if request_time < self._operation_clock:
+            raise ObserverTimeError("terminal directory cannot move operation clock backward")
+        self._operation_clock = request_time
+        self._terminal_mode = True
         self._advance_metadata(request_time)
         live: list[str] = []
         for page_key in self._candidate_keys:
@@ -398,59 +465,50 @@ class Observer:
         self._downloaded_metadata += len(response)
         self._non_body_metadata += len(response)
         self._shared_metadata += len(response)
+        self._directory_audit.append((request_time, len(response)))
+        self._metadata_additions.append((request_time, len(response)))
         self._peak_shared_metadata = max(self._peak_shared_metadata, self._shared_metadata)
         self._discovered.update(page_keys)
         return DirectoryResponse(request_time, page_keys, response)
 
     def costs(self, checkpoint: datetime | None = None) -> ObserverCosts:
-        accrued = self._metadata_byte_microseconds
-        if checkpoint is not None:
-            checkpoint = self._horizon_time(checkpoint, "checkpoint")
-            delta = elapsed_microseconds(self._metadata_time, checkpoint)
-            if delta < 0:
-                raise ObserverTimeError("checkpoint precedes retained metadata")
-            accrued += self._shared_metadata * delta
+        cutoff = HORIZON_END if checkpoint is None else self._horizon_time(checkpoint, "checkpoint")
+        additions = [(when, amount) for when, amount in self._metadata_additions if when <= cutoff]
+        retained_metadata = sum(amount for _, amount in additions)
+        running = peak_metadata = accrued = 0
+        last = HORIZON_START
+        for when, amount in sorted(additions):
+            accrued += running * elapsed_microseconds(last, when)
+            running += amount; peak_metadata = max(peak_metadata, running); last = when
+        accrued += running * elapsed_microseconds(last, cutoff)
 
-        if checkpoint is None:
-            # No checkpoint given: report the observer's own full, unconditional
-            # history (unchanged from before -- every dispatched request that has
-            # actually completed by HORIZON_END is counted).
-            outcomes = self._outcomes
-            pending = self._pending
-            downloaded_metadata = self._downloaded_metadata
-            downloaded_body = self._downloaded_body
-            unknown = self._unknown_body_attempts
-        else:
-            # A response dispatched before `checkpoint` can still resolve strictly
-            # after it (nonzero get_response_delay_us). From the checkpoint's own
-            # vantage point that request is still PENDING -- not yet a known outcome,
-            # not yet a downloaded byte -- even though the observer has, by now,
-            # already computed and cached the real (later) outcome internally.
-            # Recompute every checkpoint-sensitive field from the per-request audit
-            # trail rather than trusting the eager, checkpoint-blind running
-            # counters above, which only ever compared against HORIZON_END.
-            outcomes = {outcome: 0 for outcome in BodyOutcome}
-            pending = 0
-            downloaded_metadata = self._non_body_metadata
-            downloaded_body = 0
-            unknown = 0
-            for record in self._audit:
-                if record.response_time is None or record.response_time > checkpoint:
-                    pending += 1
-                    continue
-                outcome = BodyOutcome(record.outcome)
-                outcomes[outcome] += 1
-                downloaded_metadata += record.header_bytes
-                if outcome is BodyOutcome.BODY:
-                    downloaded_body += record.body_bytes or 0
-                elif outcome is not BodyOutcome.MISSING:
-                    unknown += 1
+        outcomes = {outcome: 0 for outcome in BodyOutcome}
+        pending = 0
+        downloaded_metadata = sum(size for when, size, _ in self._feed_audit if when <= cutoff)
+        downloaded_metadata += sum(size for when, size in self._directory_audit if when <= cutoff)
+        downloaded_body = 0
+        unknown = 0
+        for record in self._audit:
+            terminal_at_cutoff = self._terminal_mode and record.request_time == cutoff
+            if record.request_time >= cutoff and not terminal_at_cutoff:
+                continue
+            if record.response_time is None or record.response_time > cutoff:
+                pending += 1
+                continue
+            outcome = BodyOutcome(record.outcome)
+            outcomes[outcome] += 1
+            downloaded_metadata += record.header_bytes
+            if outcome is BodyOutcome.BODY:
+                downloaded_body += record.body_bytes or 0
+            elif outcome is not BodyOutcome.MISSING:
+                unknown += 1
 
         lower = downloaded_metadata + downloaded_body
         return ObserverCosts(
-            self._feed_requests,
-            self._directory_requests,
-            self._body_requests,
+            sum(when <= cutoff for when, _, _ in self._feed_audit),
+            sum(when <= cutoff for when, _ in self._directory_audit),
+            sum(record.request_time < cutoff or (self._terminal_mode and record.request_time == cutoff)
+                for record in self._audit),
             outcomes[BodyOutcome.BODY],
             outcomes[BodyOutcome.MISSING],
             outcomes[BodyOutcome.UNKNOWN],
@@ -463,9 +521,9 @@ class Observer:
             unknown,
             lower,
             None if unknown else lower,
-            self._shared_metadata,
-            self._peak_shared_metadata,
-            self._shared_metadata,
+            retained_metadata,
+            peak_metadata,
+            retained_metadata,
             accrued,
         )
 

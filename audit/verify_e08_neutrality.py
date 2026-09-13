@@ -211,6 +211,7 @@ check("GET dispatched at the first trigger's own time sees the body current AT T
 obs6 = Observer(export3, config=ObserverConfig(feed_publication_lag_us=0, get_response_delay_us=int((t2 - t1).total_seconds() * 1_000_000) + 1_000_000))
 obs6.poll_feed(t1)
 r_after_overwrite = obs6.get_body("dse~C", t1)  # dispatched causally at t1, but its OWN delay lands the response after t2
+r_after_overwrite = obs6.complete_due(r_after_overwrite.response_time)[0]
 check("GET whose response completes AFTER an overwrite sees the NEW body, never the stale trigger body", r_after_overwrite.body == b"NEW_BODY", str(r_after_overwrite.body))
 
 # ---------------------------------------------------------------------------

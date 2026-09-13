@@ -7,6 +7,7 @@ HTTP wire sizes or physical storage/RAM measurements.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
@@ -89,12 +90,47 @@ def elapsed_microseconds(start: datetime, end: datetime) -> int:
     return delta.days * 86_400_000_000 + delta.seconds * 1_000_000 + delta.microseconds
 
 
+@dataclass(frozen=True, slots=True)
+class CombinedAccounting:
+    final_s: int
+    final_m: int
+    peak_s: int
+    peak_m: int
+    synchronized_peak_s_plus_m: int
+    s_byte_microseconds: int
+    m_byte_microseconds: int
+    combined_byte_microseconds: int
+
+
+def synchronized_accounting(points: Sequence[tuple[datetime, int, int]],
+                            checkpoint: datetime) -> CombinedAccounting:
+    """Integrate exact S/M ledgers without summing independently timed peaks."""
+    checkpoint = require_utc(checkpoint, "checkpoint")
+    ordered = sorted(points, key=lambda x: x[0])
+    s = m = peak_s = peak_m = peak_combined = s_area = m_area = 0
+    last = ordered[0][0] if ordered else checkpoint
+    for when, next_s, next_m in ordered:
+        when = require_utc(when)
+        if when < last or when > checkpoint: raise ValueError("invalid accounting point order")
+        delta = elapsed_microseconds(last, when)
+        s_area += s * delta; m_area += m * delta
+        if min(next_s, next_m) < 0: raise ValueError("accounting bytes cannot be negative")
+        s, m = next_s, next_m
+        peak_s=max(peak_s,s); peak_m=max(peak_m,m); peak_combined=max(peak_combined,s+m)
+        last=when
+    delta=elapsed_microseconds(last,checkpoint)
+    s_area+=s*delta; m_area+=m*delta
+    return CombinedAccounting(s,m,peak_s,peak_m,peak_combined,s_area,m_area,s_area+m_area)
+
+
 __all__ = [
     "MICROSECONDS_PER_HOUR",
+    "CombinedAccounting",
     "canonical_array",
     "canonical_jsonl",
     "concatenated_jsonl",
     "elapsed_microseconds",
     "format_timestamp",
     "require_utc",
+    "synchronized_accounting",
 ]

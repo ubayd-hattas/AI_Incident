@@ -128,6 +128,8 @@ class SyntheticObserverTests(unittest.TestCase):
         observer.poll_feed(dt("2026-05-24T00:01:00Z"))
         response = observer.get_body("dse~A", dt("2026-05-24T00:01:00Z"))
         self.assertEqual(response.response_time, dt("2026-05-24T00:01:30Z"))
+        self.assertIsInstance(response, PendingBodyRequest)
+        response = observer.complete_due(dt("2026-05-24T00:01:30Z"))[0]
         self.assertEqual(response.outcome, BodyOutcome.BODY)
         self.assertEqual(response.body, b"new")
         self.assertNotEqual(response.body, b"old")
@@ -139,6 +141,8 @@ class SyntheticObserverTests(unittest.TestCase):
         observer = self.observer([self.save(revision), self.delete("A", "1", deleted)], [revision], delay_us=30_000_000)
         observer.poll_feed(dt("2026-05-24T00:01:00Z"))
         response = observer.get_body("dse~A", dt("2026-05-24T00:01:00Z"))
+        self.assertIsInstance(response, PendingBodyRequest)
+        response = observer.complete_due(dt("2026-05-24T00:01:30Z"))[0]
         self.assertEqual(response.outcome, BodyOutcome.MISSING)
         self.assertIsNone(response.body)
         self.assertEqual(observer.costs().downloaded_known_body_bytes, 0)
