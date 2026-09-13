@@ -2,7 +2,9 @@
 
 ## Current authority
 
-**READY FOR FINAL ENGINEERING PASS. X13 HAS NOT RUN. No real PCD-vs-E evidence result has been computed or inspected in the final consolidation.**
+**GATE 2 FAIL (Sam, `audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md`, audited `9cbf2b6`). X13 remains NOT AUTHORIZED. X13 HAS NOT RUN. No real PCD-vs-E evidence result has been computed or inspected.**
+
+Independent Gate 2 audit found the A11 benchmark, PROP-61 three-way-OR wiring, observer causal clock (X01/X02), storage/accounting, and all four hostile collector controls (F, PCD-R15, reverse-order, terminal archive) mechanically sound under adversarial hand-scored testing (see the report for the full breakdown). Four concrete, ordinary implementation gaps against `FINAL_PRE_X13_FREEZE.md`'s own explicit requirements block PASS: (1) an unguarded `KeyError` instead of fail-closed rejection when a retained-snapshot packet references a missing object; (2) no refcount/hidden-unreferenced-body validation and a cap-overflow check that silently no-ops without a supplied `declared_total_bytes`; (3) `validate_manifest()` checks `configuration_manifest.csv` by row count only, never re-hashing its content (or the source/accounting-fixture hashes also recorded in the manifest) against what's on disk; (4) the real executor never populates 17 required cost/overhead fields (synchronized byte-hours, per-row elapsed/CPU/RSS, auxiliary memory, E-policy queue stats) despite the underlying accounting function existing and being independently confirmed correct. All are Ubayd's Gate 1 engineering scope; none require reopening an annotation/methodology decision. No authorization artifact was created.
 
 `docs/FINAL_PRE_X13_FREEZE.md` is the final methodology/benchmark/evaluator/checklist authority. `docs/X13_RUN_CONTRACT.md` amendment **FINAL_PRE_X13_DEADLINE_v1** is the current experiment scope; original v0 text remains historical where amended. Older `PRE_RESULTS_AUDIT.md`, `PRE_RESULTS_CLOSURE.md` and dated acceptance/status reports are evidence history, not additional gates or permission to override this freeze.
 
