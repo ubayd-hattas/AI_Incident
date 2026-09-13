@@ -1,6 +1,18 @@
 # X13 run contract — pre-results freeze
 
-## Amendment v1 — FINAL_PRE_X13_DEADLINE_v1 (outcome-blind)
+## Runtime amendment handoff — FINAL_X13_RUNTIME_v2 BLOCKED
+
+**Current authority:** `FINAL_X13_RUNTIME_AMENDMENT.md` supersedes instructions to execute the infeasible791-row deadline roster. No replacement executable roster is frozen yet. `configs/x13_runtime_v2.json` is explicitly `BLOCKED_NOT_FROZEN`: **130 candidate collection rows +61 stable re-score families**, not authorization. Earlier working-draft freeze claims are withdrawn before any outcome access.
+
+Primary is unchanged: E30 versus all60 PCD15 phases, held-out critical core K23, July15,1MiB,lag5,delay0, nominal FIFO/exact dedup,10pp threshold and `R_E30 <= min_j R_PCD15_j`. Candidate controls retain PCD-R j0 and F, plus fixed diagnostic interval/latency/order/archive configurations. F's ambiguity-limit failure remains a blocker, not a scope omission or zero.
+
+Candidate v1 runtime omissions total661, reason `NOT_EXECUTED_RUNTIME_AMENDMENT`. Previously omitted v0 families retain `NOT_EXECUTED_SCOPE_AMENDMENT`; do not rewrite history. The report restrictions in the runtime handoff are mandatory if the candidate is subsequently frozen. No full factorial, full secondary phase-grid, comprehensive periodic-baseline or general superiority claims.
+
+Execution remains locked: full-horizon throughput/PCD-R overhead, F nominal membership, actual deadline reserves and production v2 plumbing are unresolved. The request-only18.94h screen with2x safety is not a demonstrated conservative total runtime. No scoring, authorization or new manifest was generated.
+
+**Sam — one combined independent audit of the performance-equivalent code changes and FINAL_X13_RUNTIME_v2 amendment, followed by fresh authorization if PASS.** Engineering defects return to Ubayd within this gate; no further broad Astra review. PASS requires closure of the runtime handoff's blockers, final freeze, fresh v2 manifest and exact authorization pins.
+
+## Amendment v1 — FINAL_PRE_X13_DEADLINE_v1 (historical roster; execution suspended)
 
 **Current authority:** this amendment and `FINAL_PRE_X13_FREEZE.md` supersede the original matrix/completion gates below, not its accounting, primary estimand or result guardrails. The original text is retained as v0 provenance. Decision made before any real PCD-vs-E evidence result, without running X13 or inspecting policy coverage. Research-methodology owner acts under the user's final-consolidation mandate; this is not a fabricated Sam signature.
 

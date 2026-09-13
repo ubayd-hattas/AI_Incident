@@ -42,5 +42,14 @@ def test_runner_merges_real_ledgers_through_verified_synchronized_accounting():
 def test_measured_pcdr_repair_metadata_populates_collector_aux_memory():
     assert _collector_aux_bytes(SimpleNamespace(repair_metadata_peak_bytes=123)) == 123
     assert isinstance(_collector_aux_bytes(SimpleNamespace(repair_metadata_peak_bytes=None)),str)
-def test_real_mode_requires_authorization():
-    with pytest.raises(AuthorizationError): run(ROOT,mode="real",max_rows=0)
+def test_real_mode_requires_authorization(monkeypatch, tmp_path):
+    # Isolate the authorization gate from the deliberately stale historical
+    # manifest. Do not generate source/annotation freezes or an auth artifact.
+    from ebe import x13_runner
+    monkeypatch.setattr(x13_runner, "validate_manifest", lambda repo: {"source_hash": "invented"})
+    monkeypatch.setattr(x13_runner, "sha256_file", lambda path: "0" * 64)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("real executor must not be constructed before authorization")
+    monkeypatch.setattr(x13_runner, "_make_real_executor", forbidden)
+    with pytest.raises(AuthorizationError): run(tmp_path,mode="real",max_rows=0)
+    assert not list(tmp_path.iterdir())

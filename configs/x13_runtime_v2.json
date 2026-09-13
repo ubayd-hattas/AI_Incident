@@ -1,0 +1,52 @@
+{
+  "amendment": "FINAL_X13_RUNTIME_v2",
+  "status": "BLOCKED_NOT_FROZEN",
+  "classification": "exploratory prespecified finite-benchmark simulation",
+  "outcome_access": "NONE_AT_AMENDMENT",
+  "horizon_start": "2026-05-24T00:00:00Z",
+  "checkpoint": "2026-07-15T00:00:00Z",
+  "feed_poll_interval_us": 60000000,
+  "primary": {"comparator": "PCD15", "event_collector": "E30", "held_out_critical_denominator": 23, "threshold_percentage_points": 10, "request_admissibility": "R_E30 <= min(R_PCD15_phase_j)"},
+  "expected_collection_rows": 130,
+  "expected_omitted_v1_rows": 661,
+  "expected_stable_rescore_families": 61,
+  "phase_sets": {"primary_all_60": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59], "diagnostic_spaced_12": [0,5,10,15,20,25,30,35,40,45,50,55]},
+  "defaults": {"cap": 1048576, "lag_us": 5000000, "delay_us": 0, "checkpoint": "2026-07-15T00:00:00Z", "order": "forward", "archive": false},
+  "collection_families": [
+    {"id":"PRIMARY_PCD15","policy":"PCD","interval_minutes":15,"q":null,"phases":"primary_all_60","lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":60,"reason_code":"RETAINED_PRIMARY"},
+    {"id":"PRIMARY_E30","policy":"E","interval_minutes":null,"q":30,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_PRIMARY"},
+    {"id":"FINAL_STATE_F","policy":"F","interval_minutes":null,"q":null,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_FINAL_STATE_REQUIRED_UNRESOLVED_AMBIGUITY_LIMIT"},
+    {"id":"PCD_R15_PHASE0_DIAGNOSTIC","policy":"PCD-R","interval_minutes":15,"q":null,"phases":[0],"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_REPAIR_DIAGNOSTIC"},
+    {"id":"INTERVAL_PCD5","policy":"PCD","interval_minutes":5,"q":null,"phases":"diagnostic_spaced_12","lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":12,"reason_code":"RETAINED_INTERVAL_DIAGNOSTIC"},
+    {"id":"INTERVAL_PCD60","policy":"PCD","interval_minutes":60,"q":null,"phases":"diagnostic_spaced_12","lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":12,"reason_code":"RETAINED_INTERVAL_DIAGNOSTIC"},
+    {"id":"LATENCY_PCD15_L60_D30","policy":"PCD","interval_minutes":15,"q":null,"phases":"diagnostic_spaced_12","lag_us":60000000,"delay_us":30000000,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":12,"reason_code":"RETAINED_STRONGEST_PRESPECIFIED_LATENCY_DIAGNOSTIC"},
+    {"id":"LATENCY_E30_L60_D30","policy":"E","interval_minutes":null,"q":30,"phases":null,"lag_us":60000000,"delay_us":30000000,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_STRONGEST_PRESPECIFIED_LATENCY_DIAGNOSTIC"},
+    {"id":"REVERSE_PCD15","policy":"PCD","interval_minutes":15,"q":null,"phases":"diagnostic_spaced_12","lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"reverse","checkpoint":"2026-07-15T00:00:00Z","rows":12,"reason_code":"RETAINED_ORDER_DIAGNOSTIC"},
+    {"id":"REVERSE_E30","policy":"E","interval_minutes":null,"q":30,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"reverse_ties","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_ORDER_DIAGNOSTIC"},
+    {"id":"ARCHIVE_PCD15","policy":"PCD","interval_minutes":15,"q":null,"phases":"diagnostic_spaced_12","lag_us":5000000,"delay_us":0,"cap":1048576,"archive":true,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":12,"reason_code":"RETAINED_ARCHIVE_DIAGNOSTIC"},
+    {"id":"ARCHIVE_E30","policy":"E","interval_minutes":null,"q":30,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":true,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_ARCHIVE_DIAGNOSTIC"},
+    {"id":"ARCHIVE_ONLY_CAPPED","policy":"A-only","interval_minutes":null,"q":null,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":true,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_ARCHIVE_CEILING"},
+    {"id":"ARCHIVE_ONLY_UNCAPPED","policy":"A-only","interval_minutes":null,"q":null,"phases":null,"lag_us":5000000,"delay_us":0,"cap":null,"archive":true,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_ARCHIVE_CEILING"},
+    {"id":"SECONDARY_E100","policy":"E","interval_minutes":null,"q":100,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_EVENT_SECONDARY"},
+    {"id":"SECONDARY_E300","policy":"E","interval_minutes":null,"q":300,"phases":null,"lag_us":5000000,"delay_us":0,"cap":1048576,"archive":false,"order":"forward","checkpoint":"2026-07-15T00:00:00Z","rows":1,"reason_code":"RETAINED_EVENT_SECONDARY"}
+  ],
+  "stable_rescore_families": [
+    {"id":"STABLE_PRIMARY_PCD15","source_family":"PRIMARY_PCD15","phases":"primary_all_60","rows":60,"reason_code":"RETAINED_EVALUATION_ONLY"},
+    {"id":"STABLE_PRIMARY_E30","source_family":"PRIMARY_E30","phases":null,"rows":1,"reason_code":"RETAINED_EVALUATION_ONLY"}
+  ],
+  "omissions": [
+    {"family":"P and PD primary and reverse rows","v1_rows":240,"reason_code":"NOT_EXECUTED_RUNTIME_AMENDMENT","reason":"1,551,038,656 attempts across four P/PD phase/order families; dominant demonstrated infeasibility"},
+    {"family":"PCD-R15 phases 1-59","v1_rows":59,"reason_code":"NOT_EXECUTED_RUNTIME_AMENDMENT","reason":"broad repair grid not budgeted; phase0 feasibility remains unresolved, not presumed cheap"},
+    {"family":"L-latency: all (5,30)/(60,0) and unselected (60,30) phases","v1_rows":170,"reason_code":"NOT_EXECUTED_RUNTIME_AMENDMENT","reason":"replace factorial by strongest joint degradation diagnostic"},
+    {"family":"L-interval PCD5/PCD60 phases outside diagnostic_spaced_12","v1_rows":96,"reason_code":"NOT_EXECUTED_RUNTIME_AMENDMENT","reason":"bound secondary workload to prespecified phases"},
+    {"family":"O PCD15 phases outside diagnostic_spaced_12","v1_rows":48,"reason_code":"NOT_EXECUTED_RUNTIME_AMENDMENT","reason":"bound service-order diagnostic workload"},
+    {"family":"A-live PCD15 phases outside diagnostic_spaced_12","v1_rows":48,"reason_code":"NOT_EXECUTED_RUNTIME_AMENDMENT","reason":"bound archive diagnostic workload; retain matched prefixes and ceiling"}
+  ],
+  "historical_omissions": {
+    "source":"configs/x13_deadline_v1.json and src/ebe/x13_manifest.py:OMITTED_FAMILIES",
+    "reason_code":"NOT_EXECUTED_SCOPE_AMENDMENT",
+    "families":["July 3 checkpoint","all live caps except 1 MiB","Delta1","P/PD at Delta5/60","q100/q300 outside L-primary","lag30","delay5","secondary R/O/A cross-products","P/PD archive prefixes","archive live rows at other caps","full nominal-tie trajectory enumeration","full closed +/-u trajectory enumeration/certification"]
+  },
+  "authorization": {"real_scoring":false,"required_artifact":"gate2_authorization.json","gate":"Sam combined independent audit PASS on final code/config/fresh v2 manifest; currently BLOCKED"}
+
+}

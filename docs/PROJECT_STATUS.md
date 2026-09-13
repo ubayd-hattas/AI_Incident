@@ -1,6 +1,26 @@
 # Project status — Evidence Before Erasure
 
-## Current authority
+## Current authority — RUNTIME AMENDMENT BLOCKED
+
+`docs/FINAL_X13_RUNTIME_AMENDMENT.md` is the authoritative runtime-scope handoff. It suspends execution of the infeasible791-row deadline roster but does not yet freeze an executable replacement. `configs/x13_runtime_v2.json` explicitly has status **BLOCKED_NOT_FROZEN**. Earlier working-draft freeze claims in this session were withdrawn before any outcome access.
+
+Candidate: **130 collection rows +61 stable evaluation-only families**. Primary PCD15 retains all60 phases and E30 once; K23,1MiB,July15,lag5,delay0, nominal FIFO/exact dedup,10pp and all-phase admissibility remain unchanged. Controls: PCD-R j0; F;24 interval rows;13 degraded-latency;13 reverse;15 archive including capped/uncapped archive-only;2 secondary event rows. P/PD240 omitted; candidate omissions total661 with runtime-amendment reasons. Previous v0 scope-amendment reasons remain historical and unchanged.
+
+**Blockers:** no demonstrated conservative full-horizon runtime for PCD-R/setup/evaluation; F terminal membership hits `AmbiguityLimitError`; no numerical remaining deadline with reporting/QA reserves was supplied; production v2 manifest/runner wiring remains unimplemented. The18.94h request-volume screen with2x safety is conditional, not a reliable total-runtime estimate. F is retained required, not silently dropped. These prevent claiming a frozen executable amendment.
+
+No scientific outcome, evidence coverage or unit-retention result was computed/inspected in this session. No X13 was run, no manifest/stable mask/authorization was generated, and historical failed-run records remain untouched. Historical execution did start and fail with zero completed rows; stale statements below that X13 never started must not override `audit/X13_FAILED_RUN_PRESERVATION.md`.
+
+**Next owner: Sam — one combined independent audit of the performance-equivalent code changes and FINAL_X13_RUNTIME_v2 amendment, followed by fresh authorization if PASS.** Sam audits performance equivalence, outcome-blind scope, final roster and any plumbing; ordinary repairs return to Ubayd within this single gate. Final freeze, actual feasibility, fresh v2 manifest and exact authorization pins must precede immediate execution. No further broad Astra review after Sam.
+
+Mandatory report narrowing and Ubayd's exact mechanical checklist are in the runtime handoff. A pure candidate roster expander and tests were added; production manifest/runner changes were deliberately not retained.
+
+---
+
+# Historical pre-runtime status (preserved; not current authority)
+
+All status/gate/scope assertions below describe the earlier candidate only. They do not authorize the current code or override the blocked runtime handoff above.
+
+## Historical authority
 
 **GATE 2 PASS (Sam, `audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md` §10, audited `b10596f`). X13 is not yet formally authorized — no authorization artifact exists yet, pending explicit user go-ahead given how consequential creating it is. X13 HAS NOT RUN. No real PCD-vs-E evidence result has been computed or inspected.**
 
