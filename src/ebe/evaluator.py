@@ -29,6 +29,13 @@ class RetainedBodyRecord:
     archive_key: str | None = None
 
 @dataclass(frozen=True, slots=True)
+class RetainedObjectRecord:
+    object_id: str
+    body: bytes
+    body_sha256: str
+    refcount: int
+
+@dataclass(frozen=True, slots=True)
 class RetainedFeedRecord:
     page_key: str
     action: Literal["live_change", "delete"]
@@ -46,20 +53,36 @@ class RetainedSnapshot:
     retained_body_bytes: int | None = None
     declared_total_bytes: int | None = None
     stable_support_intervals: Mapping[str, tuple[tuple[int, int | None], ...]] | None = None
+    retained_objects: tuple[RetainedObjectRecord, ...] = ()
 
     @classmethod
     def from_collector_result(cls, result) -> "RetainedSnapshot":
         export = getattr(result, "retained_export", None)
         if export is not None:
             objects = {x.object_id: x for x in export.body_objects}
-            bodies = tuple(RetainedBodyRecord(p.page_key, p.capture_time,
-                objects[p.object_id].body, p.body_sha256, p.request_seq,
-                p.packet_bytes, p.object_id, p.archive_key) for p in export.packets)
-            return cls(export.checkpoint, bodies,
+            bodies: list[RetainedBodyRecord] = []
+            for index, packet in enumerate(export.packets):
+                obj = objects.get(packet.object_id)
+                if obj is None:
+                    raise SnapshotIntegrityError(
+                        f"packet[{index}] references missing object {packet.object_id!r}"
+                    )
+                bodies.append(RetainedBodyRecord(
+                    packet.page_key, packet.capture_time, obj.body,
+                    packet.body_sha256, packet.request_seq, packet.packet_bytes,
+                    packet.object_id, packet.archive_key,
+                ))
+            retained_objects = tuple(RetainedObjectRecord(
+                obj.object_id, obj.body, obj.body_sha256, obj.refcount
+            ) for obj in export.body_objects)
+            snapshot = cls(export.checkpoint, tuple(bodies),
                 tuple(RetainedFeedRecord(r.page_key, r.action, r.event_time, poll.poll_time)
                       for poll in result.feed_polls for r in poll.records),
                 export.capacity_bytes, export.retained_packet_bytes,
-                export.retained_body_bytes, export.total_bytes)
+                export.retained_body_bytes, export.total_bytes,
+                retained_objects=retained_objects)
+            validate_snapshot(snapshot)
+            return snapshot
         return cls(result.config.checkpoint,
             tuple(RetainedBodyRecord(x.page_key, x.capture_time, x.body,
                                      x.body_sha256, x.request_seq)
@@ -95,7 +118,42 @@ def validate_snapshot(snapshot: RetainedSnapshot) -> None:
         key = record.object_id or record.body_sha256
         if key in objects and objects[key] != record.body: issues.append(f"object {key} has conflicting bytes")
         objects[key] = record.body
-    body_total = sum(len(x) for x in objects.values())
+    if snapshot.retained_objects:
+        declared_objects: dict[str, RetainedObjectRecord] = {}
+        actual_refs: dict[str, int] = {}
+        for index, obj in enumerate(snapshot.retained_objects):
+            if obj.object_id in declared_objects:
+                issues.append(f"duplicate retained object ID {obj.object_id!r}")
+            declared_objects[obj.object_id] = obj
+            if not isinstance(obj.body, bytes):
+                issues.append(f"object[{index}] body is not bytes")
+                continue
+            try: obj.body.decode("utf-8", errors="strict")
+            except UnicodeDecodeError: issues.append(f"object[{index}] is not canonical UTF-8")
+            if hashlib.sha256(obj.body).hexdigest() != obj.body_sha256:
+                issues.append(f"object[{index}] {obj.object_id!r}: body_sha256 mismatch")
+            if type(obj.refcount) is not int or obj.refcount < 1:
+                issues.append(f"object[{index}] {obj.object_id!r}: invalid refcount")
+            actual_refs[obj.object_id] = 0
+        for index, record in enumerate(snapshot.bodies):
+            if record.object_id not in declared_objects:
+                issues.append(f"body[{index}] references missing object {record.object_id!r}")
+                continue
+            obj = declared_objects[record.object_id]
+            actual_refs[record.object_id] += 1
+            if record.body != obj.body or record.body_sha256 != obj.body_sha256:
+                issues.append(f"body[{index}] object reference bytes/hash mismatch")
+        for object_id, obj in declared_objects.items():
+            if actual_refs[object_id] == 0:
+                issues.append(f"object {object_id!r} is hidden/unreferenced")
+            if obj.refcount != actual_refs[object_id]:
+                issues.append(
+                    f"object {object_id!r} refcount mismatch: "
+                    f"declared {obj.refcount}, actual {actual_refs[object_id]}"
+                )
+        body_total = sum(len(obj.body) for obj in declared_objects.values())
+    else:
+        body_total = sum(len(x) for x in objects.values())
     for index, record in enumerate(snapshot.feed_context):
         if not _aware(record.event_time) or not _aware(record.delivered_time):
             issues.append(f"feed[{index}] timestamps are not aware")
@@ -108,7 +166,7 @@ def validate_snapshot(snapshot: RetainedSnapshot) -> None:
     computed = packet_total + body_total
     if snapshot.declared_total_bytes is not None and computed != snapshot.declared_total_bytes:
         issues.append("declared total S is not synchronized")
-    if snapshot.capacity_bytes is not None and snapshot.declared_total_bytes is not None and snapshot.declared_total_bytes > snapshot.capacity_bytes:
+    if snapshot.capacity_bytes is not None and computed > snapshot.capacity_bytes:
         issues.append("retained bytes exceed cap")
     if issues: raise SnapshotIntegrityError("; ".join(issues))
 
@@ -315,4 +373,4 @@ def evaluate_benchmark(benchmark,snapshot,*,split="full",metric="core",critical_
     delays=tuple(compute_delay(p,benchmark.fragments_by_id,snapshot) for p in scoped) if metric=="core" else ()
     return EvaluationResult(split,metric,critical_only,cov.numerator,cov.denominator,cov.percentage,cov.status,cov.covered_ids,cov.uncovered_ids,tuple(excluded),delays,benchmark.benchmark_id,benchmark.artifact_hashes,cov.unknown_ids,cov.unknown_reason_codes,cov.lower_numerator,cov.upper_numerator)
 
-__all__=["Alternative","Benchmark","BodyOccurrence","CoverageResult","DelayResult","DenominatorFirewallError","EvaluationResult","EvaluatorError","Fragment","Proposition","RetainedBodyRecord","RetainedFeedRecord","RetainedSnapshot","SnapshotIntegrityError","ValidationIssue","ValidationReport","apply_stable_support_mask","compute_context_coverage","compute_core_coverage","compute_delay","context_covered","core_covered","evaluate_benchmark","fragment_satisfied","validate_population","validate_snapshot"]
+__all__=["Alternative","Benchmark","BodyOccurrence","CoverageResult","DelayResult","DenominatorFirewallError","EvaluationResult","EvaluatorError","Fragment","Proposition","RetainedBodyRecord","RetainedFeedRecord","RetainedObjectRecord","RetainedSnapshot","SnapshotIntegrityError","ValidationIssue","ValidationReport","apply_stable_support_mask","compute_context_coverage","compute_core_coverage","compute_delay","context_covered","core_covered","evaluate_benchmark","fragment_satisfied","validate_population","validate_snapshot"]
