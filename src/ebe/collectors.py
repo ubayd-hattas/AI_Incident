@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Iterator
+from typing import Iterator, Literal
 
 from .accounting import MICROSECONDS_PER_HOUR, elapsed_microseconds, require_utc
+from .accounting import canonical_jsonl
 from .observer import (
     BodyOutcome,
     BodyResponse,
@@ -26,6 +27,7 @@ from .storage import (
     Capture,
     CaptureStore,
     RetainedCapture,
+    RetainedStoreExport,
     StorageSnapshot,
 )
 from .timeline import HORIZON_END, HORIZON_START
@@ -42,6 +44,7 @@ class PeriodicPolicy(str, Enum):
     P = "P"
     PD = "PD"
     PCD = "PCD"
+    PCD_R = "PCD-R"
 
 
 class _Belief(str, Enum):
@@ -57,6 +60,7 @@ class PeriodicConfig:
     phase_us: int = 0
     capacity_bytes: int | None = None
     checkpoint: datetime = HORIZON_END
+    service_order: Literal["forward", "reverse"] = "forward"
 
     def __post_init__(self) -> None:
         if not isinstance(self.policy, PeriodicPolicy):
@@ -72,6 +76,8 @@ class PeriodicConfig:
         checkpoint = require_utc(self.checkpoint, "checkpoint")
         if not HORIZON_START < checkpoint <= HORIZON_END:
             raise ValueError("checkpoint must be in (HORIZON_START, HORIZON_END]")
+        if self.service_order not in ("forward", "reverse"):
+            raise ValueError("service_order must be forward or reverse")
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +87,7 @@ class EventDerivedConfig:
     q: int
     capacity_bytes: int | None = None
     checkpoint: datetime = HORIZON_END
+    reverse_title_ties: bool = False
 
     def __post_init__(self) -> None:
         if type(self.q) is not int or self.q <= 0:
@@ -148,6 +155,8 @@ class CollectorResult:
     peak_dirty_titles: int
     event_stats: EventDerivedStats | None = None
     retained_evidence: tuple[RetainedEvidenceUnit, ...] = ()
+    retained_export: RetainedStoreExport | None = None
+    repair_metadata_peak_bytes: int | None = None
 
     @property
     def requests_made(self) -> int:
@@ -218,6 +227,8 @@ class PeriodicCollector:
 
     def run(self) -> CollectorResult:
         config = self.config
+        if config.policy is PeriodicPolicy.PCD_R:
+            return self._run_repair()
         deduplicate = config.policy is not PeriodicPolicy.P
         store = CaptureStore(
             config.capacity_bytes,
@@ -254,7 +265,7 @@ class PeriodicCollector:
 
             assert next_sweep is not None
             sweeps.append(next_sweep)
-            if config.policy is PeriodicPolicy.PCD:
+            if config.policy in {PeriodicPolicy.PCD, PeriodicPolicy.PCD_R}:
                 eligible = sorted(
                     page_key
                     for page_key in dirty
@@ -266,14 +277,19 @@ class PeriodicCollector:
                     for page_key, belief in beliefs.items()
                     if belief in {_Belief.LIVE, _Belief.MIXED}
                 )
+            if config.service_order == "reverse":
+                eligible.reverse()
             for page_key in eligible:
                 body_results.append(self.observer.get_body(page_key, next_sweep))
-            if config.policy is PeriodicPolicy.PCD:
+            if config.policy in {PeriodicPolicy.PCD, PeriodicPolicy.PCD_R}:
                 # A sweep is the frozen service point. Every eligible dirty title was
                 # attempted; confirmed deletes were already removed on feed delivery.
                 dirty.difference_update(eligible)
             next_sweep = next(sweep_iter, None)
 
+        revealed = {item.request_seq: item for item in self.observer.complete_due(config.checkpoint)}
+        body_results = [revealed.get(item.request_seq, item) if isinstance(item, PendingBodyRequest)
+                        else item for item in body_results]
         attempts: list[CaptureAttempt] = []
         completed = sorted(
             (
@@ -315,7 +331,73 @@ class PeriodicCollector:
             peak_discovered,
             peak_dirty,
             retained_evidence=retained_evidence,
+            retained_export=store.export_retained(config.checkpoint),
         )
+
+    def _run_repair(self) -> CollectorResult:
+        """Frozen online PCD-R control (the R block uses zero response delay)."""
+        config = self.config
+        if self.observer.config.get_response_delay_us != 0:
+            raise CollectorError("PCD-R delayed scheduling requires completion-event replay")
+        store = CaptureStore(config.capacity_bytes, deduplicate=True, start_time=HORIZON_START)
+        beliefs: dict[str, _Belief] = {}; dirty: set[str] = set()
+        # Content-free repair metadata: last completed known hash and byte length.
+        last_known: dict[str, tuple[str, int]] = {}
+        polls=[]; sweeps=[]; results=[]; attempts=[]
+        peak_discovered=peak_dirty=metadata_peak=0
+        sweep_iter=iter(periodic_sweep_times(config.interval_us, config.phase_us,
+                                             checkpoint=config.checkpoint))
+        next_sweep=next(sweep_iter,None); next_poll=HORIZON_START
+        poll_step=timedelta(microseconds=self.observer.config.feed_poll_interval_us)
+        while next_poll<=config.checkpoint or next_sweep is not None:
+            if next_poll<=config.checkpoint and (next_sweep is None or next_poll<=next_sweep):
+                poll=self.observer.poll_feed(next_poll); polls.append(poll)
+                self._apply_feed_batch(poll,beliefs,dirty)
+                peak_discovered=max(peak_discovered,len(beliefs)); peak_dirty=max(peak_dirty,len(dirty))
+                next_poll+=poll_step; continue
+            assert next_sweep is not None; sweeps.append(next_sweep)
+            ordinary={p for p in dirty if beliefs[p] in {_Belief.LIVE,_Belief.MIXED}}
+            repairs=set()
+            prospective=len(results)+1
+            for page_key,(body_hash,body_len) in last_known.items():
+                if beliefs.get(page_key) not in {_Belief.LIVE,_Belief.MIXED}: continue
+                retained=any(p.page_key==page_key and p.body_sha256==body_hash
+                             for p in store.retained_captures)
+                if retained: continue
+                dummy=Capture(page_key,next_sweep,prospective,b"x"*body_len)
+                if config.capacity_bytes is None or len(dummy.packet_bytes)+body_len<=config.capacity_bytes:
+                    repairs.add(page_key)
+            eligible=sorted(ordinary|repairs, reverse=config.service_order=="reverse")
+            for page_key in eligible:
+                is_ordinary=page_key in ordinary
+                if not is_ordinary:
+                    body_len=last_known[page_key][1]
+                    dummy=Capture(page_key,next_sweep,len(results)+1,b"x"*body_len)
+                    if config.capacity_bytes is not None and len(dummy.packet_bytes)+body_len>config.capacity_bytes:
+                        continue
+                response=self.observer.get_body(page_key,next_sweep); results.append(response)
+                if not isinstance(response,BodyResponse): raise CollectorError("PCD-R R block response unexpectedly pending")
+                if response.outcome is BodyOutcome.BODY:
+                    assert response.body is not None
+                    capture=Capture(page_key,response.response_time,response.request_seq,response.body)
+                    attempts.append(CaptureAttempt(capture,store.admit(capture)))
+                    last_known[page_key]=(capture.body_sha256,len(capture.body))
+                else:
+                    last_known.pop(page_key,None)
+            dirty.difference_update(ordinary)
+            metadata_peak=max(metadata_peak,len(canonical_jsonl({
+                page:[digest,length] for page,(digest,length) in sorted(last_known.items())})))
+            next_sweep=next(sweep_iter,None)
+        snapshot=store.snapshot(config.checkpoint)
+        retained_evidence=tuple(RetainedEvidenceUnit(
+            rc.page_key,rc.capture_time,rc.request_seq,rc.body_sha256,
+            store.body_for_capture(rc.request_seq)) for rc in store.retained_captures)
+        return CollectorResult(config,tuple(polls),tuple(sweeps),tuple(results),tuple(attempts),
+            store.retained_captures,snapshot,self.observer.costs(config.checkpoint),
+            self.observer.discovered_titles,peak_discovered,peak_dirty,
+            retained_evidence=retained_evidence,
+            retained_export=store.export_retained(config.checkpoint),
+            repair_metadata_peak_bytes=metadata_peak)
 
     @staticmethod
     def _apply_feed_batch(
@@ -414,9 +496,9 @@ class EventDerivedCollector:
             last_refill = dispatch_time
 
             while dirty and token_credit >= MICROSECONDS_PER_HOUR:
-                page_key, _pending_time = min(
-                    dirty.items(), key=lambda item: (item[1], item[0])
-                )
+                oldest = min(value for value in dirty.values())
+                tied = [key for key, value in dirty.items() if value == oldest]
+                page_key = (max(tied) if config.reverse_title_ties else min(tied))
                 del dirty[page_key]
                 body_results.append(self.observer.get_body(page_key, dispatch_time))
                 token_credit -= MICROSECONDS_PER_HOUR
@@ -424,6 +506,9 @@ class EventDerivedCollector:
                 starved += 1
             next_dispatch += dispatch_step
 
+        revealed = {item.request_seq: item for item in self.observer.complete_due(config.checkpoint)}
+        body_results = [revealed.get(item.request_seq, item) if isinstance(item, PendingBodyRequest)
+                        else item for item in body_results]
         attempts: list[CaptureAttempt] = []
         completed = sorted(
             (
@@ -479,6 +564,7 @@ class EventDerivedCollector:
             peak_dirty,
             stats,
             retained_evidence=retained_evidence,
+            retained_export=store.export_retained(config.checkpoint),
         )
 
     @staticmethod

@@ -179,9 +179,9 @@ check(
 collectors_src = (REPO / "src" / "ebe" / "collectors.py").read_text(encoding="utf-8")
 import re as _re  # noqa: E402
 observer_accesses = sorted(set(_re.findall(r"self\.observer\.(\w+)", collectors_src)))
-ALLOWED_OBSERVER_SURFACE = {"config", "poll_feed", "get_body", "discovered_titles", "costs"}
+ALLOWED_OBSERVER_SURFACE = {"config", "poll_feed", "get_body", "complete_due", "discovered_titles", "costs"}
 check(
-    "collectors.py touches ONLY the allowed neutral Observer surface (config/poll_feed/get_body/discovered_titles/costs) -- no trace, revision, final-directory, annotation, or criticality access anywhere in the file",
+    "collectors.py touches ONLY the allowed neutral Observer surface (including opaque-response completion) -- no trace, revision, final-directory, annotation, or criticality access anywhere in the file",
     set(observer_accesses) <= ALLOWED_OBSERVER_SURFACE,
     str(observer_accesses),
 )

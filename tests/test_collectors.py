@@ -579,7 +579,7 @@ class EventDerivedCollectorTests(unittest.TestCase):
             and node.value.attr == "observer"
         }
         self.assertLessEqual(
-            direct, {"config", "poll_feed", "discovered_titles", "get_body", "costs"}
+            direct, {"config", "poll_feed", "discovered_titles", "get_body", "complete_due", "costs"}
         )
 
     def test_no_annotation_or_semantic_modules_are_imported_for_e10(self) -> None:
