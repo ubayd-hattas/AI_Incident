@@ -83,3 +83,4 @@ mean guessing the schema).
    completeness), E (eligibility mask) — all annotation-authorship work, matching `docs/PROJECT_STATUS.md`'s
    existing record exactly.
 7. **Confirmed:** no real annotation file was read, scored, or modified by this work.
+> Historical substrate note: the authorized core-evidence evaluator candidate now supersedes this implementation snapshot. See `docs/E12_EVALUATOR.md`. The context axis remains `NOT_FROZEN`, and X13 remains unauthorized.
