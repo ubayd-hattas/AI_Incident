@@ -45,6 +45,20 @@ def _utc(value: str) -> datetime:
     return parsed
 
 
+def _raw_body_bytes(body: str) -> bytes:
+    """Reverse E05's unconditional Latin-1 JSON projection."""
+    return body.encode("latin-1")
+
+
+def _canonical_body_bytes(body: str, encoding: str) -> bytes:
+    """Convert reconstructed source bytes to the observer's canonical UTF-8."""
+    raw = _raw_body_bytes(body)
+    codec = {"ascii": "ascii", "utf8": "utf-8", "latin1": "latin-1"}.get(encoding)
+    if codec is None:
+        raise ValueError(f"unsupported body encoding: {encoding!r}")
+    return raw.decode(codec, errors="strict").encode("utf-8")
+
+
 def _unique(rows: list[dict[str, Any]], key: str, issues: list[ValidationIssue]) -> dict[str, dict[str, Any]]:
     result: dict[str, dict[str, Any]] = {}
     for row in rows:
@@ -126,6 +140,19 @@ def load_a11_benchmark(
 
     span_quotes: dict[str, list[str]] = {}
     for evidence_id, row in evidence_by_id.items():
+        revision = revisions_by_id.get(row.get("rev_id"))
+        if revision is None:
+            issues.append(ValidationIssue("UNRESOLVED_EVIDENCE_REVISION", evidence_id))
+        else:
+            body = revision.get("body")
+            try:
+                raw = _raw_body_bytes(body) if isinstance(body, str) else None
+            except UnicodeEncodeError:
+                raw = None
+            if raw is None:
+                issues.append(ValidationIssue("UNRESOLVABLE_EVIDENCE_BODY", evidence_id))
+            elif hashlib.sha256(raw).hexdigest() != row.get("source_body_hash"):
+                issues.append(ValidationIssue("EVIDENCE_BODY_HASH_MISMATCH", evidence_id))
         spans = row.get("source_spans")
         if not isinstance(spans, list) or not spans:
             issues.append(ValidationIssue("MISSING_CORE_SPANS", evidence_id))
@@ -171,7 +198,15 @@ def load_a11_benchmark(
         if not isinstance(body, str) or encoding not in ("ascii", "utf8", "latin1"):
             issues.append(ValidationIssue("UNRESOLVABLE_BODY", occurrence_id))
             continue
-        raw = body.encode("latin-1") if encoding == "latin1" else body.encode("utf-8")
+        # E05 stores the raw JSON body as a Latin-1 projection of the original
+        # byte sequence.  body_encoding classifies those source bytes; it does
+        # not change how the projection itself is reversed.
+        try:
+            raw = _raw_body_bytes(body)
+            canonical = _canonical_body_bytes(body, encoding)
+        except (UnicodeEncodeError, UnicodeDecodeError, ValueError):
+            issues.append(ValidationIssue("UNRESOLVABLE_BODY", occurrence_id))
+            continue
         if hashlib.sha256(raw).hexdigest() != occurrence.get("body_sha256"):
             issues.append(ValidationIssue("OCCURRENCE_BODY_HASH_MISMATCH", occurrence_id))
             continue
@@ -193,7 +228,7 @@ def load_a11_benchmark(
         span_index = matching_indices[0]
         bucket = support[evidence_id].setdefault(rev_id, {
             "page_key": page_key,
-            "body_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
+            "body_sha256": hashlib.sha256(canonical).hexdigest(),
             "source_body_sha256": occurrence["body_sha256"],
             "timestamp": occurrence.get("wall_timestamp"),
             "spans": {},

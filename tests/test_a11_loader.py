@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from ebe.a11_loader import load_a11_benchmark  # noqa: E402
+from ebe.a11_loader import _canonical_body_bytes, _raw_body_bytes, load_a11_benchmark  # noqa: E402
 from ebe.evaluator import DenominatorFirewallError, validate_population  # noqa: E402
 
 
@@ -96,6 +96,36 @@ class A11LoaderStructuralTests(unittest.TestCase):
     def test_context_axis_is_explicitly_not_frozen(self) -> None:
         self.assertEqual(self.benchmark.context_status, "NOT_FROZEN")
         self.assertTrue(self.benchmark.validation.valid)
+
+
+class A11RawBodyEncodingTests(unittest.TestCase):
+    def test_ascii_projection_reconstructs_source_and_canonical_bytes(self) -> None:
+        self.assertEqual(_raw_body_bytes("plain ASCII"), b"plain ASCII")
+        self.assertEqual(_canonical_body_bytes("plain ASCII", "ascii"), b"plain ASCII")
+
+    def test_utf8_projection_is_reversed_before_declared_encoding_is_interpreted(self) -> None:
+        projection = b"T\xc3\xbcrkiye".decode("latin-1")
+        self.assertEqual(_raw_body_bytes(projection), b"T\xc3\xbcrkiye")
+        self.assertEqual(_canonical_body_bytes(projection, "utf8"), "Türkiye".encode("utf-8"))
+
+    def test_latin1_projection_is_reversed_before_canonicalization(self) -> None:
+        projection = b"caf\xe9".decode("latin-1")
+        self.assertEqual(_raw_body_bytes(projection), b"caf\xe9")
+        self.assertEqual(_canonical_body_bytes(projection, "latin1"), "café".encode("utf-8"))
+
+    def test_real_frozen_files_expose_the_exact_known_hash_defects(self) -> None:
+        benchmark = load_a11_benchmark(fail_on_error=False)
+        evidence_mismatches = {
+            issue.message for issue in benchmark.validation.issues
+            if issue.code == "EVIDENCE_BODY_HASH_MISMATCH"
+        }
+        occurrence_mismatches = {
+            issue.message for issue in benchmark.validation.issues
+            if issue.code == "OCCURRENCE_BODY_HASH_MISMATCH"
+        }
+        self.assertEqual(evidence_mismatches, {"PROP-20260617-17", "PROP-20260617-18"})
+        self.assertEqual(len(occurrence_mismatches), 80)
+        self.assertIn("OCC-PROP-20260617-17-001", occurrence_mismatches)
 
 
 if __name__ == "__main__":
