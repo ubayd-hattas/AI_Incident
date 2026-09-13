@@ -310,3 +310,26 @@ Files changed/added: this document; `docs/X13_RUN_CONTRACT.md`;
 `src/ebe/x13_runtime_v2.py`; `tests/test_x13_runtime_v2_roster.py`;
 `tests/test_x13_manifest.py`; `tests/test_x13_runner_synthetic.py`.
 Production collector/evaluator/manifest/runner/reporting/CLI files are unchanged.
+
+## 11. Final disposition: blockers did not all close, no authorization issued
+
+Sam's combined audit (`audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md` sections
+12-13) closed blockers D and E outright (mechanical plumbing confirmed inert
+against real execution; the manifest-hash discrepancy in section 2 above was
+benign, the two hashes describe two different things, a stale checked-in
+freeze artifact versus a fresh regeneration at a later commit) and made real
+progress on A (empirically timed the low-request tier at roughly 12 hours
+serial), but blockers A, B, and C did not fully close. PCD-R specifically was
+given two independent, equivalence-verified bug fixes and still did not
+complete a full-horizon run in any tested window, so it should be treated as
+comparable in cost to the infeasible P/PD rows, not to plain PCD. F's
+`AmbiguityLimitError` was root-caused to one specific page and one specific
+missing exception handler, and was deliberately left unfixed because the
+correct behavior requires a real decision about F's frozen contract
+semantics, not a same-semantics performance fix. No numeric deadline/reserve
+budget was ever supplied for blocker C.
+
+**No fresh v2 manifest was regenerated, no combined PASS was issued, and no
+real execution was authorized on this candidate.** The project's actual final
+submission is an honest incomplete-execution report (`report/report.tex`),
+not a completed run under this amendment.
