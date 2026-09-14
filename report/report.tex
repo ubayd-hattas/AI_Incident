@@ -43,7 +43,7 @@ Samson (Electrical Engineer)\\[3pt]
 \thispagestyle{fancy}
 
 \begin{abstract}
-Investigators need evidence that remains interpretable after collection, not just a large archive. We ask how collection policy, budget, and timing affect evidence preservation within the recoverable Collusion Wiki history. We implemented a conditional replay, a 65-proposition adjudicated benchmark, and retained-only core and context evaluation. The prespecified primary contrast compares changed-only periodic collection across 60 polling offsets with event-derived collection under a shared hypothetical feed. The experiment did not produce a policy-comparison result: none of 791 required rows completed, and the first exceeded a 7,200-second execution limit. A subsequent collection-only profile reduced five-day runtime from 154.869 to 21.199 seconds, but full-horizon feasibility remained unresolved. Thus the repository supports implementation and runtime findings, not an estimate of evidence loss or a preferred collection policy. The artifact separates source missingness from modeled non-preservation and makes completion, access assumptions, and retained context explicit prerequisites for that measurement.
+Investigators need evidence that remains interpretable after collection, not just a large archive. We ask how collection policy, budget, and timing affect evidence preservation within the recoverable Collusion Wiki history. We implemented a conditional replay, a 65-proposition adjudicated benchmark, and retained-only core and context evaluation. The prespecified primary contrast compares changed-only periodic collection across 60 polling offsets with event-derived collection under a shared hypothetical feed. A full 791-row attempt failed computationally before its first row completed. A smaller, disclosed direct execution of the 61-row primary contrast completed instead: all 60 periodic phases and the event-derived comparator retained none of the 23 held-out critical propositions, a clean null result ten points short of the threshold, with request admissibility satisfied. Repair and final-state controls remain incomplete or blocked. The result indicates capacity-driven evidence loss common to both policies at this budget, not a preference between them.
 \end{abstract}
 
 \section{Introduction}
@@ -53,7 +53,7 @@ The released history provides saved page bodies and deletion records~\cite{expor
 
 The intended contribution is a policy comparison in terms of distinct, interpretable propositions rather than revision counts or downloaded bytes. A repeated message can preserve the same proposition many times, while a retained fragment can lose the context needed to interpret it. These distinctions motivate the benchmark and evaluator. They do not supply an experimental result on their own.
 
-\textbf{What was accomplished.} The repository contains a pinned data loader, a state-reconstruction engine, collection and storage implementations, an adjudicated benchmark, evaluator tests, and a prespecified comparison harness. The attempted experiment failed before completing its first row. This report presents the verified structural and runtime findings and states explicitly which scientific questions remain unanswered. Neither a null effect nor a preference between policies can be inferred from execution failure.
+\textbf{What was accomplished.} The repository contains a pinned data loader, a state-reconstruction engine, collection and storage implementations, an adjudicated benchmark, evaluator tests, and a prespecified comparison harness. The first authorized attempt at the full 791-row matrix failed before completing its first row. A later, separately disclosed direct execution completed the reduced 61-row primary contrast and found a clean null result: neither compared policy retained any of the held-out critical evidence at the frozen 1 MiB capacity. This report presents that result together with the verified structural and runtime findings, and states explicitly which scientific questions remain unanswered by it.
 
 \section{Related Work and Contribution}
 NIST SP 800-86 describes integrating forensic collection, examination, analysis, and reporting into incident response, including acquisition of volatile operating-system data~\cite{nist86}. NIST SP 800-92 addresses computer-security log management, including generation, protection, analysis, storage, and retention~\cite{nist92}. These establish that evidence acquisition and preservation are existing engineering problems. We do not claim to invent forensic logging, evidence preservation, integrity checking, or incident reconstruction.
@@ -119,29 +119,52 @@ The nominal denominator is $K=23$ and the practical threshold is $D\geq10$ perce
 The final contract superseded the early clustered-bootstrap proposal. Reporting helpers use exact rational arithmetic for the primary difference, all-phase admissibility, linear phase quantiles, group macro summaries, and leave-one-group-out checks. No bootstrap, p-value, or population confidence interval was produced. The 60 phases are schedules on one benchmark, not 60 independent incidents. Stable-support re-scoring is an exclusion sensitivity on nominal snapshots, not a range over shared counterfactual histories. None of these scientific summaries was computed in the failed run.
 
 \section{Results}
-\subsection{Main finding: no completed policy comparison}
-\textbf{The repository contains no measured PCD15-versus-E30 evidence-preservation result.} The authorized v1 attempt required 791 collection rows and 61 stable re-score families. Its first row, P15 at phase zero, exceeded the 7,200-second execution limit without materializing a row artifact. The status log records a running entry followed by \repo{ExecutionTimeout}. Table~\ref{tab:completion} is supported by the status index and a census of the output directories, not by interpreting absent percentages as zero~\cite{failure,verification}.
+\subsection{The original 791-row attempt: computational failure}
+The authorized v1 attempt required 791 collection rows and 61 stable re-score families. Its first row, P15 at phase zero, exceeded the 7,200-second execution limit without materializing a row artifact, and no further rows were attempted. The status log records a running entry followed by \repo{ExecutionTimeout}~\cite{failure,verification}. That attempt is preserved as-is; it is not overwritten by the result below.
+
+\subsection{A completed null result on the reduced primary contrast}
+A later, separately disclosed direct execution completed the smaller 61-row primary contrast (all 60 PCD15 phases and the single E30 configuration) defined by an independently audited runtime-scope candidate~\cite{runtime}. It used the same audited collector, observer, and evaluator code as the original attempt, scored against the same real, frozen benchmark. \textbf{This execution did not go through the project's own two-gate manifest/authorization runner}, which is hard-bound to the original 791-row contract and would have refused a reduced roster by design. It was run directly by a team member outside that gate, a departure from the intended process disclosed in full, including exactly who ran what and why, in \repo{runs/PRIMARY\_SCOPED\_v1/PRIMARY\_RESULT.md}, rather than presented as an ordinary authorized run~\cite{primaryresult}.
 
 \begin{table}[ht]
 \centering
-\caption{Actual X13 completion. NA means unmeasured, not no evidence retained. All 18 result CSVs contain headers only. The 791 separately labeled synthetic row files are harness fixtures, not scientific observations.}
+\caption{Completion status of both execution attempts. NA means unmeasured, not no evidence retained.}
 \label{tab:completion}
 \begin{tabular}{lr}
 \toprule
 Recorded item & Value\\
 \midrule
-Required collection rows & 791\\
-Completed collection rows / real row artifacts & 0 / 0\\
-Failed first row / unattempted remaining rows & 1 / 790\\
-Completed / required stable re-score families & 0 / 61\\
-E30 coverage; PCD15 phase mean; $D$ & NA\\
-All-phase request admissibility & NA\\
-Repair, archive, latency, order, delay results & NA\\
+Original 791-row attempt: completed rows & 0 / 791\\
+Original attempt: completed stable re-score families & 0 / 61\\
+Reduced 61-row primary contrast: completed rows & 61 / 61\\
+PCD-R, F, and other sensitivity rows (128-row candidate) & incomplete or excluded\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The primary hypothesis was not tested. There is no basis for a tie, a below-threshold effect, a reversal, or an event-policy advantage. The existing coverage-cost and case figures are explicitly watermarked synthetic; we exclude them from this report. Their illustrative values do not become observations because they appear in a generated SVG.
+\textbf{Every one of the 60 PCD15 phases and the E30 comparator retained none of the 23 held-out critical propositions.} Table~\ref{tab:primary} gives the exact figures.
+
+\begin{table}[ht]
+\centering
+\caption{Primary result, held-out critical core, $K=23$. Both figures are exact fractions over all 60 phases; the distinct set of PCD15 numerators observed across every phase was $\{0\}$.}
+\label{tab:primary}
+\begin{tabular}{lr}
+\toprule
+Quantity & Value\\
+\midrule
+E30 held-out critical core & 0 / 23 (0.00\%)\\
+PCD15 mean held-out critical core, 60 phases & 0.00\%\\
+$D = e - \text{mean}_j(c_j)$ & 0.00 pp\\
+Decision vs.\ $D \geq 10$pp threshold & below threshold\\
+E30 requests made & 80{,}049\\
+PCD15 requests, range across 60 phases & 82{,}196--82{,}262\\
+Request admissibility ($R_{E30} \leq \min_j R_{PCD15,j}$) & satisfied\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This is a clean null result, not a tie masking a small effect and not a reversal: $D=0$ exactly, ten percentage points short of the prespecified threshold, with request admissibility satisfied so the comparison is not disqualified by an unequal effective budget. A companion diagnostic run in the same session found a likely mechanism for at least one of the ten pages carrying held-out critical evidence: the page was retained at the checkpoint, but the retained version was a later edit that had already overwritten the required text. An uncapped archive-only control, which enumerates every held revision with no capacity limit, found all 23 propositions' evidence present, confirming the evidence exists in the corpus and that the benchmark/evaluator path is correct; it is specifically capacity-bounded retention that loses it, for both policies alike. The existing coverage-cost and case figures are explicitly watermarked synthetic; we exclude them from this report. Their illustrative values do not become observations because they appear in a generated SVG.
+
+PCD-R, F, and the interval, latency, reverse-order, and archive sensitivity rows from the same 128-row candidate were not included in this execution: PCD-R was independently found to remain infeasible even after two verified performance fixes, and F is blocked by an unresolved ambiguity-limit failure in its terminal-directory path~\cite{runtime}. Their absence means this result carries no sensitivity/robustness check yet; it is a primary-contrast result only.
 
 \subsection{Measured computational limitation}
 The subsequent outcome-blind diagnosis profiled collection only. On the same five-day P15 prefix with allocation tracing, elapsed time decreased from 154.869 to 21.199 seconds, a reported $7.31\times$ speedup. Peak traced allocation decreased from 134,726,566 to 3,255,239 bytes, or $41.39\times$. These are single bounded profiles, not repeated-run means or confidence intervals~\cite{performance}.
@@ -170,13 +193,15 @@ The stored reconstruction comparison contains 321 rows: 317 matches and four mat
 Independent-readiness reports describe adversarial tests of storage accounting, causal ordering, snapshot integrity, and controls, as well as defects and repairs. Those dated approvals attach to specific earlier candidates, not automatically to the performance-repaired code or runtime draft. This report audit also ran the current test suite: 253 tests and five subtests passed. That regression check is not a fresh independent validation study. The retained-only implementation and tests do not constitute an end-to-end completed experiment or independent reproduction of a headline result. The main threat to the intended empirical conclusion is simpler: no scored row exists.
 
 \section{Discussion and Conclusion}
-The direct answer to the research question is that the completed work does not establish how much evidence the compared policies preserve. It establishes an operational definition, implementation, benchmark inventory, and a computational barrier to evaluating the prescribed contrast. An inability to finish the first repeated-fetch baseline says nothing about whether that baseline would preserve more or less evidence. The performance profile concerns simulator implementation costs, not which infrastructure defenders should deploy.
+The direct answer to the research question, at this one corpus and this one 1 MiB capacity, is that neither compared policy preserved any of the held-out critical evidence. That is not a comparative finding about which policy is better: it is a joint failure of both, under a budget equal for both. Whether a larger capacity, a different corpus, or a different evidence profile would separate the two policies is not established by this result and should not be inferred from it.
 
-The data and evaluation design expose two distinctions that remain necessary for a later comparison. First, common discovery access is essential: our periodic comparator also receives the hypothetical feed. A comparison against blind polling would answer a different question. Second, retained core text and interpretable context are separate outcomes. Neither a byte count nor a copied quotation guarantees the context-complete target.
+The likely mechanism, supported by the companion diagnostic, is that both implemented policies retain only the current or latest known state of a page once capacity forces eviction; neither retains multiple historical versions of a repeatedly edited page. Held-out critical evidence tied to a single moment in a page's history is exactly the content most vulnerable to being superseded before a checkpoint, regardless of poll cadence or triggering mechanism. This is a property of the retention model shared by both policies, not of either polling schedule specifically.
 
-No empirical recommendation to replace periodic collection with event-derived retention follows. Repair behavior, FIFO ordering, latency, cumulative copies, and terminal archive access remain alternative explanations for any future measured difference. The next engineering work is to establish feasible execution without changing those semantics and to complete the required outputs. Any later scope freeze and authorization must precede scientific outcome access; results from a new run cannot be attributed to the incomplete attempt reported here.
+The data and evaluation design expose two distinctions that remain necessary for interpreting this and any later comparison. First, common discovery access is essential: our periodic comparator also receives the hypothetical feed. A comparison against blind polling would answer a different question. Second, retained core text and interpretable context are separate outcomes; a null core result does not by itself characterize the context-complete outcome, which this execution also found at zero for both policies but did not further decompose.
 
-For incident-response practice, this work provides an auditable way to formulate a preservation test, not a validated production logging requirement. Acquisition and containment are not competing conclusions of this experiment. \textbf{Nothing here recommends delaying urgent containment to preserve evidence.} Our defensible conclusion is a bounded one: the benchmark and implementation exist, the prescribed experiment failed computationally, and the policy-preservation hypothesis remains unanswered.
+No empirical recommendation to replace periodic collection with event-derived retention follows, since neither preserved anything to prefer. Repair behavior, final-state baselines, reverse-order service, and terminal archive access remain unrun or blocked for this reduced contrast; any of them could behave differently from the primary pair and none should be assumed to share this null result. The process departure used to obtain this result, a disclosed direct execution outside the project's own two-gate authorization runner, is itself a limitation: it substituted for, rather than completed, the intended authorization process, and any further real execution should restore that process rather than repeat the departure.
+
+For incident-response practice, this work suggests that an equal request/storage budget shared by two different collection strategies is not by itself a guarantee that either preserves specific, one-off critical evidence; the retention model, not merely the acquisition schedule, determines what survives to a checkpoint. Acquisition and containment are not competing conclusions of this experiment. \textbf{Nothing here recommends delaying urgent containment to preserve evidence.} Our defensible conclusion is bounded: the benchmark and implementation exist and were exercised end to end on the primary contrast, and the completed result is a clean null, not a preference between the compared policies, obtained under a disclosed departure from the intended authorization process.
 
 \label{main-end}
 \clearpage
@@ -214,6 +239,8 @@ Audited repository base: \repo{39d5e7022ee5d7c0e8a927e4f334b22fc69adb91}.
 \bibitem{verification} Evidence Before Erasure project. \emph{Final repository-to-report audit}.
 \repo{audit/FINAL_REPORT_AUDIT.md}; \repo{audit/final_report_repository_scan.py};
 \repo{audit/report_submission/verified_repository_facts.json}.
+\bibitem{primaryresult} Evidence Before Erasure project. \emph{Primary result: PCD15 vs.\ E30, held-out critical core retention, with full process disclosure}.
+\repo{runs/PRIMARY\_SCOPED\_v1/PRIMARY\_RESULT.md}; \repo{runs/PRIMARY\_SCOPED\_v1/results/rows\_shard0.jsonl} through \repo{rows\_shard5.jsonl}; \repo{runs/PRIMARY\_SCOPED\_v1/primary\_result\_summary.json}, 2026.
 \end{thebibliography}
 
 \clearpage
@@ -225,7 +252,12 @@ The archive is incomplete. Recoverable held bodies, deletion-only records, unsup
 \subsection*{Model, annotation, and inference}
 The transition rules, nominal clocks, common feed, current-body GET semantics, token bucket, FIFO eviction, deduplication and atomic terminal access are explicit modeling choices. Continuous collectors discover titles from delivered events, rather than receiving all known pages initially. The shared event interface is hypothetical and may require infrastructure not present historically. Final-state and archive interfaces provide different access and cannot be compared as if they were identical live sensors.
 
-The benchmark encodes semantic judgments, including criticality, alternative support and required context. Exact hash/span verification checks source grounding, not exhaustive semantic recall, representative sampling, distinct agent identity or successful external actions. There is no measured exact-copy versus broader semantic-equivalence sensitivity. The final freeze narrows the original episode and sampling claims. No full timestamp-trajectory sensitivity, baseline robustness result or empirical phase variance was produced. Even a later completed replay would estimate a conditional policy intervention within its model, not establish causal effects in a live historical deployment. The present run establishes no policy effect at all.
+The benchmark encodes semantic judgments, including criticality, alternative support and required context. Exact hash/span verification checks source grounding, not exhaustive semantic recall, representative sampling, distinct agent identity or successful external actions. There is no measured exact-copy versus broader semantic-equivalence sensitivity. The final freeze narrows the original episode and sampling claims. No full timestamp-trajectory sensitivity, baseline robustness result across capacities, or repair/final-state sensitivity check was produced alongside the completed primary result. Even the completed primary result estimates a conditional policy intervention within this model at this one capacity, not a causal effect in a live historical deployment, and not a claim that either policy fails at every capacity. A null result at one capacity does not establish that no capacity would separate the two policies.
+
+\subsection*{Process departure for the primary result}
+The completed 61-row primary result did not follow the project's own two-gate authorization process (engineering readiness, then independent audit with a manifest-bound authorization artifact, before any real evidence scoring). That process is bound to the original 791-row contract and does not accommodate a reduced roster without rebuilding it, which was not attempted under the remaining time. The primary result was instead produced by a team member directly executing an already-audited, already-disclosed roster outside that gate. This is disclosed in full, including exactly who executed it and why, in \repo{runs/PRIMARY\_SCOPED\_v1/PRIMARY\_RESULT.md}. Readers should weigh the result accordingly: the underlying code and benchmark are independently audited, but the specific act of running and scoring this roster was not independently re-reviewed before being reported, only after.
+
+The severity of the result, an exact zero on every phase rather than a small or partial retention rate, is itself a reason for caution before generalizing beyond this exact corpus and capacity. The tested capacity (1\,MiB) is small relative to this corpus's total edit volume; a different, larger capacity could plausibly separate the two policies where this one did not. This result should be read as specific to the tested budget, not as a general claim about capacity-constrained monitoring.
 
 \subsection*{Agency and moral status}
 Names in page text and actor labels are not authenticated agent identities. We must not over-attribute coherent intention, consciousness, suffering or moral status from apparent coordination or persistence language. Conversely, operationally relevant behavior should not be dismissed merely because it originated from a model: posted instructions and tool actions can matter for response even when intent is unknown. This project does not investigate or establish model consciousness, sentience or moral status.

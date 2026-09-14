@@ -24,13 +24,21 @@ independently audited and found not yet authorizable: two of the reduced candida
 either unproven-feasible or blocked outright. See `docs/PROJECT_STATUS.md` and
 `audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md` (sections 10-13) for the full history and exact reasons.
 
+**A real primary result exists, obtained outside the normal authorization gate, disclosed in full.** The reduced
+61-row primary contrast (all 60 PCD15 phases plus E30) was executed directly against the real benchmark. Every
+phase and E30 scored 0/23 held-out critical core: a clean null result, ten percentage points short of the frozen
+10pp threshold, with request admissibility satisfied. Exactly who ran it and why is disclosed in
+`runs/PRIMARY_SCOPED_v1/PRIMARY_RESULT.md` and `audit/FINAL_PRE_X13_INDEPENDENT_READINESS.md` section 14. This does
+not authorize the reduced 130-row candidate as a whole, which remains **NOT PASS**.
+
 ## Current results
 
-There is no real coverage, cost, or policy-comparison result. The submitted report states this directly rather than
-filling the gap with a placeholder number.
+The primary contrast has one real, completed, honest result: a null (see above). PCD-R, F, and the remaining
+sensitivity rows are still incomplete or excluded. The submitted report states all of this directly rather than
+filling any gap with a placeholder number.
 
 - [Final report](report/report.tex) (PDF: `report/report.pdf`, pending a fresh recompile): the actual submission,
-  an honest incomplete-execution report with independently fact-checked citations to this repository.
+  now including the real primary result and its process disclosure.
 - [SYNTHETIC, watermarked coverage-cost placeholder](figures/coverage_cost.svg): superseded illustrative figure, not a finding, excluded from the final report.
 - [SYNTHETIC, watermarked Construction/ZZZ panel](figures/case_walkthrough.svg): superseded illustrative figure, not a finding, excluded from the final report.
 - [Judge walkthrough](docs/JUDGE_WALKTHROUGH.md): the one worked, inspectable development example (Construction/ZZZ, `GRP-01-CONSTRUCT`).

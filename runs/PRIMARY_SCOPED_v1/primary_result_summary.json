@@ -1,0 +1,25 @@
+{
+  "rows_used": 61,
+  "e30_core": {
+    "numerator": 0,
+    "denominator": 23,
+    "percentage": 0.0
+  },
+  "pcd15_core_mean_over_60_phases": 0.0,
+  "D_core_percentage_points": 0.0,
+  "D_core_meets_10pp_threshold": false,
+  "e30_context": {
+    "numerator": 0,
+    "denominator": 23,
+    "percentage": 0.0
+  },
+  "pcd15_context_mean_over_60_phases": 0.0,
+  "D_context_percentage_points": 0.0,
+  "e30_requests_made": 80049,
+  "pcd15_requests_min": 82196,
+  "pcd15_requests_max": 82262,
+  "request_admissibility_e30_le_min_pcd15": true,
+  "distinct_pcd15_core_numerators_across_60_phases": [
+    0
+  ]
+}
