@@ -10,4 +10,5 @@ docs/HANDOFF_P14_2026-09-13.md
 *.onetoc2
 .DS_Store
 Thumbs.db
+~$*.docx
 
