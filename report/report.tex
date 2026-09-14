@@ -34,7 +34,7 @@ Alex Nicolaides (Electrical Engineer)\\
 Aaron Vettiyamkunnath (Electrical Engineer)\\
 Jaswin Chinthala (Electrical Engineer)\\
 Ubayd Hattas (Data Science, Statistics and Computer Science)\\
-Samson (Electrical Engineer)\\[3pt]
+Samson Okuthe (Electrical Engineer)\\[3pt]
 \small Institutional affiliation not specified in the repository
 \end{tabular}}
 \date{\small Apart $\times$ CeSIA AI Incident Response Research Sprint\\Track 2: What happened, and what breaks next}
@@ -205,6 +205,10 @@ No empirical recommendation to replace periodic collection with event-derived re
 For incident-response practice, this work suggests that an equal request/storage budget shared by two different collection strategies is not by itself a guarantee that either preserves specific, one-off critical evidence; the retention model, not merely the acquisition schedule, determines what survives to a checkpoint. Acquisition and containment are not competing conclusions of this experiment. \textbf{Nothing here recommends delaying urgent containment to preserve evidence.} Our defensible conclusion is bounded: the benchmark and implementation exist and were exercised end to end on the primary contrast, and the completed result is a clean null, not a preference between the compared policies, obtained under a disclosed departure from the intended authorization process.
 
 \label{main-end}
+
+\section*{Author Contributions}
+Roles below are drawn from the project's own commit history and audit trail, not self-reported after the fact. Ubayd Hattas: primary implementation of the state-reconstruction engine, observer/storage substrate, collection policies, and evaluator; the engineering-readiness gate; and the performance repairs described in the Measured computational limitation subsection. Jaswin Chinthala: manifest and runtime-scope integration, benchmark context integration, the runtime-v2 amendment, and this report's rewrite into its current form. Samson Okuthe: the independent audit gate (methodology and implementation verification against the frozen contract), the disclosed direct execution and aggregation of the primary result in the Results section, and this report's final consistency review. Alex Nicolaides: benchmark annotation and evidence adjudication (first reviewer). Aaron Vettiyamkunnath: benchmark annotation and evidence adjudication (second reviewer), source and export audit. AI coding and research assistants were used throughout, for implementation assistance, independent adversarial verification, debugging, and report drafting and consistency checking, as disclosed in the AI assistance and author information subsection; the named authors are responsible for and must approve all reported results and conclusions.
+
 \clearpage
 \begin{thebibliography}{10}
 \bibitem{nist86} Karen Kent, Suzanne Chevalier, Tim Grance, and Hung Dang.
