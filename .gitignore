@@ -12,3 +12,6 @@ docs/HANDOFF_P14_2026-09-13.md
 Thumbs.db
 ~$*.docx
 
+
+# LaTeX build output (the final PDF is report/report.pdf)
+report/build/
